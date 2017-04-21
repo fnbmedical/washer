@@ -1,0 +1,1256 @@
+﻿Version=5.02
+NumberOfModules=2
+Module1=create_File
+Module2=sql_capture
+Build1=Default,b4a.example
+ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: http://www.b4x.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="5" android:targetSdkVersion="14"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~SetApplicationAttribute(android:theme, "@android:style/Theme.Holo")~\n~'End of default text.~\n~
+IconFile=
+NumberOfFiles=3
+File1=iniwindow.bal
+File2=mainwindow.bal
+File3=testwindow.bal
+NumberOfLibraries=10
+Library1=core
+Library2=ahviewpager
+Library3=reflection
+Library4=sql
+Library5=acl
+Library6=byteconverter
+Library7=javaobject
+Library8=ispermcpp
+Library9=seriallibjab
+Library10=randomaccessfile
+@EndOfDesignText@
+'author 张阳光
+'time 2017-2-23
+#Region  Project Attributes 
+	#ApplicationLabel: Isperm
+	#VersionCode: 1
+	#VersionName: 
+	'SupportedOrientations possible values: unspecified, landscape or portrait.
+	#SupportedOrientations: unspecified
+	#CanInstallToExternalStorage: True
+#End Region
+
+#Region  Activity Attributes 
+	#FullScreen: True
+	#IncludeTitle: False
+#End Region
+
+Sub Process_Globals
+	'These global variables will be declared once when the application starts.
+	'These variables can be accessed from all modules.
+	'''''''#############'''''''''''
+	'左右滑动参数
+	Dim TYPE_ISPERM_CAPTURE As Int : TYPE_ISPERM_CAPTURE = 1
+	Dim TYPE_ISPERM_TEST As Int : TYPE_ISPERM_TEST = 2
+	Dim TYPE_ISPERM_INI As Int : TYPE_ISPERM_INI = 3
+	
+	Dim FILL_PARENT As Int : FILL_PARENT = -1
+	Dim WRAP_CONTENT As Int : WRAP_CONTENT = -2
+	'We put this information to the panel tag of the panel for the pages
+	Type PanelInfo (PanelType As Int, LayoutLoaded As Boolean)
+	
+	Dim CurrentPage As Int : CurrentPage = 0
+	'''''''#############'''''''''''
+	
+	'''''''#############'''''''''''
+	'采集定时器
+	Dim taskTime As Timer
+	Dim taskTime2 As Timer
+	'''''''#############'''''''''''
+End Sub
+
+Sub Globals
+	'These global variables will be redeclared each time the activity is created.
+	'These variables can only be accessed from this module.
+	'''''''#############'''''''''''
+	'左右滑动参数
+	Dim container As AHPageContainer
+	Dim pager As AHViewPager
+	Dim tabs As AHViewPagerTabs
+	'''''''#############'''''''''''
+	
+	'''''''#############'''''''''''
+	'mainwindow
+	Private btnCapture As Button
+	Private btnExit_Main As Button
+	Private ltvCapture As ListView
+	Private palShowRadio As Panel
+	
+	Dim usbSerial1 As SerialPort
+	Dim aSync As AsyncStreams
+	'Dim OS As OperatingSystem
+	
+	Dim camera1 As AdvancedCamera
+	
+	Dim flag_Picture As Boolean
+	Dim flag_Task As Boolean = True
+	
+	'图片存储路径
+	Dim strPath As String
+	'第几张图片
+	Dim photo_num As Int 
+	'图片总数
+	Dim photo_Count As Int = 20
+	'图片采集完成时间
+	Dim ana_time As String
+	'采集点数目
+	Dim ana_Point_Num As Int = 2
+	'采集点记数
+	Dim ana_Point_Num_Count As Int = 0
+	'采集样本编号
+	Dim pigid_Main As Int = 10000
+	
+	'返回指令分析
+	Dim serial_Return_Data As Int = 0
+	
+	Dim SERIAL_PORT As String = "/dev/ttyAMA2"
+	Dim SERIAL_RATE As String = "9600"
+	Dim SERIAL_NUM As Int = 2
+	'''''''#############'''''''''''
+	
+	'''''''#############'''''''''''
+	'testwindow
+	Private btnAnay As Button
+	Private btnDrawContours As Button
+	Private btnExit_Test As Button
+	Private btnGaussianBlur As Button
+	Private btnStretch As Button
+	Private btnSubDraw As Button
+	Private igShow As ImageView
+	Private ltv_anay_point As ListView
+	Private ltv_anay_time As ListView
+	Private ltv_pigid As ListView
+	Private ltvTable_Test As ListView
+	Private lbl_Count As Label
+	Private lbl_Rate As Label
+	
+	'引入的分析算法的jar
+	Dim isperm As IspermCpp
+	
+	Dim pigid As String
+	Dim ana_capture_point As String
+	Dim anay_time As String
+	
+	Dim ana_capture_path As String
+	Dim ana_history_path As String
+	'''''''#############'''''''''''
+	
+	'''''''#############'''''''''''
+	'iniwindow
+	Private btnAddOne As Button
+	Private btnAddTen As Button
+	Private btnDelOne As Button
+	Private btnDelTen As Button
+	Private btnExit_Ini As Button
+	Private btnSave As Button
+	Private lblView As Label
+	Private ltvTable_Ini As ListView
+	
+	'全局map类型,存储配置文件中的键值对
+	Dim itemMap As Map
+	Dim itemMapKey As String
+	'全局map类型,存储配置文件初始值
+	Dim itemMap_Begin As Map
+	'全局变量,避免加减法时出现溢出现象
+	Dim lbl_text_int As Int
+	Dim lbl_text_double As Double
+	'''''''#############'''''''''''
+	
+	Dim button_RGBA As Button
+End Sub
+
+'隐藏智能手机的功能键(虚拟按键) 返回/主页/多任务切换
+Sub ForceImmersiceMode
+	Dim r As Reflector
+	r.Target = r.GetActivity
+	r.Target = r.RunMethod("getWindow")
+	r.Target = r.RunMethod("getDecorView")
+	r.RunMethod2("setSystemUiVisibility", 5894, "java.lang.int")
+End Sub
+
+'判断当前活动是否获得焦点
+Sub Activity_WindowFocusChanged(HasFocus As Boolean)
+	If HasFocus Then
+		ForceImmersiceMode
+	End If
+End Sub
+
+Sub Activity_Create(FirstTime As Boolean)
+	'Do not forget to load the layout file created with the visual designer. For example:
+	'Activity.LoadLayout("Layout1")
+	Activity.Height = -1
+	Activity.Width = -1
+	ltvCapture.Initialize("ltvCapture")
+	palShowRadio.Initialize("")
+	
+	igShow.Initialize("igShow")
+	ltv_pigid.Initialize("ltv_pigid")
+	ltv_anay_point.Initialize("ltv_anay_point")
+	ltv_anay_time.Initialize("ltv_anay_time")
+	ltvTable_Test.Initialize("ltvTable_Test")
+	lbl_Count.Initialize("lbl_Count")
+	lbl_Rate.Initialize("lbl_Rate")
+	
+	ltvTable_Ini.Initialize("ltvTable_Ini")
+	lblView.Initialize("")
+	
+	container.Initialize()
+	For i = 0 To 2
+		Dim pan As Panel
+		pan.Initialize("")
+		Select i
+			Case 0
+				pan = CreatePanel(TYPE_ISPERM_CAPTURE,"mainwindow")
+				pan.AddView(palShowRadio,0,34dip + 2dip,640dip,480dip)
+				pan.AddView(ltvCapture,640dip,34dip + 2dip,300dip,420dip)
+				container.AddPage(pan,"采集")
+			Case 1
+				pan = CreatePanel(TYPE_ISPERM_TEST,"testwindow")
+				pan.AddView(igShow,0,80,480,360)
+				pan.AddView(ltv_pigid,20,0,130,70)
+				pan.AddView(ltv_anay_point,170,0,100,70)
+				pan.AddView(ltv_anay_time,290,0,190,70)
+				pan.AddView(ltvTable_Test,500,130,280,200)
+				lbl_Count.SetTextSizeAnimated(0,30)
+				pan.AddView(lbl_Count,490,340,120,40)
+				lbl_Rate.SetTextSizeAnimated(0,30)
+				pan.AddView(lbl_Rate,610,340,120,40)
+				container.AddPage(pan,"调试")
+			Case 2
+				pan = CreatePanel(TYPE_ISPERM_INI,"iniwindow")
+				lblView.SetTextSizeAnimated(0,50)
+				pan.AddView(lblView,400dip,50dip,120dip,60dip)
+				pan.AddView(ltvTable_Ini,10dip,20dip,370dip,400dip)
+				container.AddPage(pan,"设置")
+		End Select
+	Next
+	
+	pager.Initialize(container,"Pager")
+	
+	tabs.Initialize(pager)
+	
+	tabs.LineHeight = 5dip
+	tabs.UpperCaseTitle = True
+	Activity.AddView(tabs,0,0,FILL_PARENT,WRAP_CONTENT)
+	'Activity.AddView(palShowRadio,0,34dip + 2dip,640dip,480dip)
+	Activity.AddView(pager,0,34dip + 2dip,Activity.Width, Activity.Height)
+	
+	Try
+		usbSerial1.SetPort(SERIAL_PORT,SERIAL_RATE,SERIAL_NUM)
+	Catch(LastException)
+		ToastMessageShow(LastException.Message,True)
+	End Try
+	aSync.Initialize(usbSerial1.InputStream,usbSerial1.OutputStream,"Astreams")
+	
+	IniListView_Pigid
+	IniListView_Point
+	IniListView_Time
+	Show_Photo
+	Show_LtvTable
+	
+	read_Table_Dict
+	fullTable
+	lbl_Text_ltvTable
+End Sub
+
+Sub Activity_Resume
+	pager.GotoPage(CurrentPage,False)
+	
+	CreateTable
+	camera1.Initialize(palShowRadio,"Camera2")
+	Try
+		usbSerial1.SetPort(SERIAL_PORT,SERIAL_RATE,SERIAL_NUM)
+	Catch(LastException)
+		ToastMessageShow(LastException.Message,True)
+	End Try
+	aSync.Initialize(usbSerial1.InputStream,usbSerial1.OutputStream,"Astreams")
+	
+	IniListView_Pigid
+	IniListView_Point
+	IniListView_Time
+	Show_Photo
+	Show_LtvTable
+	
+	read_Table_Dict
+	fullTable
+	lbl_Text_ltvTable
+End Sub
+
+Sub Activity_Pause (UserClosed As Boolean)
+	camera1.StopPreview()
+	camera1.Release()
+	If UserClosed Then
+		aSync.Close()
+		usbSerial1.close()
+	End If
+End Sub
+
+'''''''#############'''''''''''
+'This creates a page of the given type
+Sub CreatePanel(PanelType As Int, Title As String) As Panel
+	Dim pan As Panel
+	Dim pio As PanelInfo
+	
+	pio.Initialize()
+	pio.LayoutLoaded = False
+	pio.PanelType = PanelType
+
+	pan.Initialize("")
+	
+	pan.Tag = pio
+	Return pan
+End Sub
+
+'界面转换
+Sub Pager_PageChanged (Position As Int)
+	Log ("Page Changed to " & Position)
+	'If ana_Point_Num_Count == 0 Then
+	CurrentPage = Position
+	'End If
+	If CurrentPage == 0 Then
+		'CreateTable
+		'camera1.Initialize(palShowRadio,"Camera2")
+		camera1.StartPreview()
+		CreateTable
+	Else If CurrentPage == 1 Then
+		camera1.StopPreview()
+		If taskTime.IsInitialized() Then
+			taskTime.Enabled = False
+		End If
+		If taskTime2.IsInitialized() Then
+			taskTime2.Enabled = False
+		End If
+		IniListView_Pigid
+		IniListView_Point
+		IniListView_Time
+		Show_Photo
+		Show_LtvTable
+		'camera1.Release()
+	Else if CurrentPage == 2 Then
+		camera1.StopPreview()
+		read_Table_Dict
+		fullTable
+		lbl_Text_ltvTable
+	End If
+End Sub
+
+'载入样板
+Sub Pager_PageCreated (Position As Int, Page As Object)
+	Log ("Page created " & Position)
+	
+	Dim pan As Panel
+	Dim pi As PanelInfo
+	
+	pan = Page
+	pi = pan.Tag
+	
+	Select pi.PanelType
+		Case TYPE_ISPERM_CAPTURE
+			If Not(pi.LayoutLoaded) Then
+				pan.LoadLayout("mainwindow")
+				pi.LayoutLoaded = True
+			End If
+		Case TYPE_ISPERM_TEST
+			If Not(pi.LayoutLoaded) Then
+				pan.LoadLayout("testwindow")
+				pi.LayoutLoaded = True
+			End If
+		Case TYPE_ISPERM_INI
+			If Not(pi.LayoutLoaded) Then
+				pan.LoadLayout("iniwindow")
+				pi.LayoutLoaded = True
+			End If
+	End Select		
+End Sub
+'''''''#############'''''''''''
+
+'''''''#############'''''''''''
+'采集
+'开启相机
+Sub Camera2_Ready(Success As Boolean)
+	'横屏
+	If Activity.Width > Activity.Height Then
+		Try
+			camera1.OriLandscape()
+		Catch
+			Msgbox(LastException.Message,"设置错误...")
+		End Try
+	'竖屏
+	Else
+		Try
+			camera1.OriPortrait()
+		Catch
+			Msgbox(LastException,"设置错误...")
+		End Try
+	End If
+	
+	If Success Then
+		camera1.PictureSize(640,480)
+		camera1.StartPreview()
+	Else
+		ToastMessageShow("无法开启相机....",True)
+	End If
+End Sub
+
+'相机拍摄
+Sub Camera2_PictureTaken(Data() As Byte)
+	Dim out As OutputStream
+	Dim str_num As String
+	'ToastMessageShow(strPath,True)
+	taskTime.Enabled = False
+	camera1.PictureSize(640,480)
+	camera1.StartPreview()
+	'camera1.setResolution(200,320)
+	If photo_num < 10 Then
+		str_num = "00"&photo_num
+	Else
+		str_num = "0"&photo_num
+	End If
+	
+	out = File.OpenOutput(File.DirRootExternal&strPath, str_num&".jpg", False)
+	out.WriteBytes(Data, 0, Data.Length)
+	out.Close
+	
+	If photo_num >= photo_Count Then
+		flag_Picture = False
+		taskTime.Enabled = False
+		flag_Task = True
+		ana_Point_Num_Count = ana_Point_Num_Count + 1
+	Else
+		flag_Picture = True
+		taskTime.Enabled = True
+		
+	End If
+	photo_num = photo_num + 1
+End Sub
+
+'退出
+Sub btnExit_Main_Click
+	camera1.StopPreview()
+	camera1.Release()
+	Activity.Finish()
+End Sub
+
+Sub btnEnabled(flag_Enabled As Boolean)
+	'2017-2-24 问题:移除新添加的控制界面跳转(在拍照时界面不跳转)按钮
+	'按钮重新设置为全局变量 2017-2-27 解决
+	If flag_Enabled == False Then
+		button_RGBA.Initialize("button_RGBA")
+		button_RGBA.Color = Colors.ARGB(0,0,0,0)
+		Activity.AddView(button_RGBA, 0, 0, Activity.Width, Activity.Height)
+	Else
+		Try
+			button_RGBA.RemoveView()
+		Catch(LastException)
+			ToastMessageShow(LastException.Message,True)
+		End Try
+	End If
+	btnCapture.Enabled = flag_Enabled
+	btnExit_Main.Enabled = flag_Enabled
+End Sub
+
+Sub taskTime_Tick
+	If flag_Picture Then
+		flag_Picture = False
+		camera1.TakePicture()
+	End If
+End Sub
+
+Sub taskTime2_Tick
+	
+	If ana_Point_Num_Count == ana_Point_Num Then
+		taskTime2.Enabled = False
+		btnEnabled(True)
+		Return
+	End If
+	
+	If flag_Task Then
+		flag_Task = False
+		photo_Point	
+	End If
+End Sub
+
+'根据采集点执行拍照
+Sub photo_Point
+	
+	If ana_Point_Num_Count == 0 Then 
+		sql_capture.FlagIni()
+		pigid_Main = sql_capture.QueryIDMax("capture","pigid")
+		sql_capture.CloseSQL("pigpet.db")
+		'send_Cmd("AA5508001001010200001c")
+		photo_Save(pigid_Main,ana_Point_Num_Count + 1)
+	End If
+	'先置初始位置，再移动托盘
+	If ana_Point_Num_Count == 1 Then 
+		'send_Cmd("AA5508001001010200001c")
+		'send_Cmd("AA55080010010102001935")
+		photo_Save(pigid_Main,ana_Point_Num_Count + 1)
+	End If
+	
+	If ana_Point_Num_Count == 2 Then 
+		'send_Cmd("AA5508001001010200001c")
+		'send_Cmd("AA5508001001010200324e")
+		photo_Save(pigid_Main,ana_Point_Num_Count + 1)
+	End If
+	
+	If ana_Point_Num_Count == 3 Then 
+		'send_Cmd("AA5508001001010200001c")
+		'send_Cmd("AA55080010010102004b67")
+		photo_Save(pigid_Main,ana_Point_Num_Count + 1)
+	End If
+End Sub
+
+'点击采集图片，将相关信息存储到数据库中
+'四个点 问题尚未解决
+Sub btnCapture_Click
+	'握手
+	send_Cmd("AA5508001001434f4e544d")
+	'握手成功继续，不成功则不去拍照
+	'If serial_Return_Data <> 1 Then
+	'	Return
+	'End If
+	'serial_Return_Data为2时去拍照片
+	If ana_Point_Num_Count <> 0 Then
+		ana_Point_Num_Count = 0
+	End If
+	'If taskTime.IsInitialized Then
+	taskTime.Initialize("taskTime",250)
+	taskTime2.Initialize("taskTime2",250)
+	taskTime2.Enabled = True
+	'End If	
+	btnEnabled(False)
+	
+	'IniListView_Pigid
+	'IniListView_Point
+	'IniListView_Time
+	'Show_Photo
+	'Show_LtvTable
+	
+	excu_Cmd_Data
+End Sub
+
+'拍照
+Sub photo_Save(pigid_Save As Int,i_params As Int)
+	Dim id As Int
+	
+	Dim timeNow As Long
+	Dim params() As Object 
+	
+	photo_num = 0
+	flag_Picture = True
+	
+	timeNow = DateTime.Now
+	strPath = create_File.Create_Dir(timeNow)
+	ana_time = create_File.TimeFormat(timeNow)
+	taskTime.Enabled = True
+	'camera1.TakePicture()
+	sql_capture.FlagIni()
+	id = sql_capture.QueryIDMax("capture","id")
+	sql_capture.CloseSQL("pigpet.db")	
+	params = Array As Object(id+1,pigid_Save+1,ana_time,i_params,strPath,0,0,0,1)
+	sql_capture.FlagIni()
+	sql_capture.InsertToCapture("capture",params)
+	sql_capture.CloseSQL("pigpet.db")
+	CreateTable
+End Sub
+
+'点击跳到调试
+'Sub btnAnay_Click
+'	camera1.StopPreview()
+'	camera1.Release()
+	'Activity.Finish()
+'End Sub
+
+'调用数据库数据填充到listView
+Sub CreateTable
+	Dim cursors As Cursor
+	Dim strs As String 
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	ltvCapture.Clear()
+	cloumns = Array As Object("pigid","ana_time")
+	params.Initialize()
+	sql_capture.FlagIni()
+	
+	cursors = sql_capture.QueryColumnData("capture",cloumns,params,False)
+	'ToastMessageShow(cursors.RowCount,False)
+	For i = 0 To cursors.RowCount - 1
+		cursors.Position = i
+		strs = cursors.GetInt(cloumns(0))&"   "&cursors.GetString(cloumns(1))
+		ltvCapture.AddSingleLine2(strs,strs)
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+End Sub
+
+'发送指令
+Sub send_Cmd(cmd As String)
+	Dim byteArray(0) As Byte
+	Dim aStr As ByteConverter
+	'Dim cmd_type As String
+	
+	If cmd.Length < 22 Then
+		Return
+	End If
+	'发送指令给下位机
+	byteArray = aStr.HexToBytes(cmd)
+	aSync.Write(byteArray)
+	
+	'cmd_type = cmd.SubString2(2,8)
+	'ToastMessageShow(cmd_type,True)
+End Sub
+
+'解析下位机的数据
+Sub recevie_Cmd(cmd_Recevie As String)
+	Select cmd_Recevie.SubString2(10,16)
+		'握手返回
+		Case "03434f"
+			serial_Return_Data = 1
+		'托盘响应
+		Case "030102"
+			serial_Return_Data = 2
+		'电源和LED开关控制
+		Case "030201","030202","030203","030204","030205"
+			serial_Return_Data = 3
+		'恒温温度控制
+		Case "030301"
+			'恒温模块开启
+			If cmd_Recevie.SubString2(18,20) == "00" Then
+				serial_Return_Data = 4
+			End If
+			'恒温模块关闭
+			serial_Return_Data = 5
+		'恒温模块设置
+		Case "030302"
+			serial_Return_Data = 6
+		'恒温温度上报
+		Case "040302"
+			serial_Return_Data = 7	
+		'载玻片温度上报
+		Case "040303"
+			serial_Return_Data = 8
+		'适配器上报
+		Case "040401"
+			serial_Return_Data = 9
+		'电池上报
+		Case "040402"
+			serial_Return_Data = 10
+		'关机指令响应
+		Case "030502"
+			serial_Return_Data = 11
+		'关机指令上报
+		Case "040501"
+			serial_Return_Data = 12	
+		'错误指令不做处理
+		Case Else
+			serial_Return_Data = 13
+	End Select
+End Sub
+
+'数据操作(接收下位机传输的数据)
+Sub Astreams_NewData(Buffer() As Byte)
+	Dim cmd_Recevie As String
+	Dim conv As ByteConverter
+	
+	'AA5508001001434f4e544d
+	cmd_Recevie = conv.HexFromBytes(Buffer).ToLowerCase()
+	
+	'ToastMessageShow(cmd_Recevie,True)
+	
+	If cmd_Recevie.Length() < 22 Then
+		Return
+	End If
+	recevie_Cmd(cmd_Recevie)
+	
+	If serial_Return_Data <> 0 Then
+		excu_Cmd_Data
+	End If
+	'ToastMessageShow("通信成功",True)
+	
+	'ToastMessageShow("Success...",True)
+End Sub
+
+'数据错误
+Sub Astreams_Error()
+	ToastMessageShow(LastException.Message,True)
+End Sub
+
+'根据返回指令类型,判断执行什么动作
+Sub excu_Cmd_Data 
+	
+	serial_Return_Data = 0
+End Sub
+'''''''#############'''''''''''
+
+'''''''#############'''''''''''
+'testwindow
+'ltv_pigid初始化
+Sub IniListView_Pigid
+	Dim cursor1 As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	cloumns = Array As Object("pigid")
+	params.Initialize()
+	sql_capture.FlagIni()
+	pigid = ""
+	ltv_pigid.Clear()
+	
+	
+	'ltv_pigid初始化
+	cursor1 = sql_capture.QueryColumnData("capture",cloumns,params,True)
+	For i = 0 To cursor1.RowCount - 1
+		cursor1.Position = i
+		If i == 0 Then
+			pigid = cursor1.GetInt(cloumns(0))
+		End If
+		ltv_pigid.AddSingleLine2(cursor1.GetInt(cloumns(0)),cursor1.GetInt(cloumns(0)))
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+	get_ana_capture_path
+End Sub
+
+'ltv_anay_point初始化
+Sub IniListView_Point	
+	ltv_anay_point.Clear()
+	
+	'ltv_anay_point初始化
+	For i = 0 To 3
+		ltv_anay_point.AddSingleLine2("采集点"&(i+1),i+1)
+	Next
+	
+	ana_capture_point = 1
+	
+	get_ana_capture_path
+End Sub
+
+'
+Sub get_ana_capture_path
+	Dim cursor1 As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	cloumns = Array As Object("ana_path")
+	params.Initialize()
+	sql_capture.FlagIni()
+	ana_capture_path = ""
+	cursor1 = sql_capture.QueryColumnData("capture",cloumns,params,False)
+	For i = 0 To cursor1.RowCount - 1
+		cursor1.Position = i
+		If i == 0 Then
+			ana_capture_path = cursor1.GetString(cloumns(0))
+		End If
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+	Show_Photo
+	Show_LtvTable
+End Sub
+
+'ltv_anay_time初始化
+Sub IniListView_Time
+	Dim cursor1 As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	cloumns = Array As Object("anay_time","ana_path")
+	params.Initialize()
+	sql_capture.FlagIni()
+	anay_time = ""
+	ana_history_path = ""
+	ltv_anay_time.Clear()
+	
+	If pigid <> Null And pigid <> "" Then
+		params.Put("pigid",pigid)
+		params.Put("ana_capture_point",ana_capture_point)
+	End If
+	
+	'ltv_anay_time初始化
+	cursor1 = sql_capture.QueryColumnData("resulthistory",cloumns,params,False)
+	For i = 0 To cursor1.RowCount - 1
+		cursor1.Position = i
+		If i == 0 Then
+			anay_time = cursor1.GetString(cloumns(0))
+			ana_history_path = cursor1.GetString(cloumns(1))
+		End If
+		ltv_anay_time.AddSingleLine2(cursor1.GetString(cloumns(0)),cursor1.GetString(cloumns(0)))
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+End Sub
+
+'显示初始图片
+Sub Show_Photo
+	Dim cursor1 As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	cloumns = Array As Object("ana_path")
+	params.Initialize()
+	sql_capture.FlagIni()
+	ana_capture_path = ""
+	
+	If pigid <> Null And pigid <> "" Then
+		params.Put("pigid",pigid)
+		params.Put("ana_capture_point",ana_capture_point)
+	End If
+	
+	'ltv_anay_time初始化
+	cursor1 = sql_capture.QueryColumnData("capture",cloumns,params,False)
+	For i = 0 To cursor1.RowCount - 1
+		cursor1.Position = i
+		If i == 0 Then
+			ana_capture_path = cursor1.GetString(cloumns(0))
+		End If
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+	If ana_capture_path <> Null And ana_capture_path <> "" Then
+		If File.Exists(File.DirRootExternal, ana_capture_path&"/"&"000.jpg") == True Then
+			igShow.Bitmap = LoadBitmapSample(File.DirRootExternal,ana_capture_path&"/000.jpg",360,480)
+		End If
+	End If
+End Sub
+
+'显示分析后的图片
+Sub Show_anay_Photo(picture_Type As String)
+	If ana_history_path <> Null And ana_history_path <> "" Then
+		If File.Exists(File.DirRootExternal, ana_history_path&"/"&picture_Type&".jpg") == True Then
+			igShow.Bitmap = LoadBitmapSample(File.DirRootExternal,ana_history_path&"/"&picture_Type&".jpg",360,480)
+		End If
+	End If
+End Sub
+
+'点击打开活跃图
+Sub btnSubDraw_Click
+	Show_anay_Photo("SubDrawContours")
+End Sub
+
+'点击打开均衡图
+Sub btnStretch_Click
+	Show_anay_Photo("Stretch")
+End Sub
+
+'点击打开滤波图
+Sub btnGaussianBlur_Click
+	Show_anay_Photo("GaussianBlur")
+End Sub
+
+'点击退出
+Sub btnExit_Test_Click
+	Activity.Finish()
+	'StartActivity("Main")
+End Sub
+
+'点击打开结果图
+Sub btnDrawContours_Click
+	Show_anay_Photo("DrawContours")
+End Sub
+
+Sub btnEnabled_Test(flag_Enabled As Boolean)
+	btnAnay.Enabled = flag_Enabled
+	btnExit_Test.Enabled = flag_Enabled
+End Sub
+
+'ltvTable内容填充
+Sub Show_LtvTable
+	Dim cursor1 As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	params.Initialize()
+	sql_capture.FlagIni()
+	ltvTable_Test.Clear()
+	
+	If anay_time <> Null And anay_time <> "" Then
+		params.Put("pigid",pigid)
+		params.Put("ana_capture_point",ana_capture_point)
+		params.Put("anay_time",anay_time)
+		cloumns = Array As Object("ana_sperm_count","ana_sperm_active","videocalw","videocalh","videoshoww","videoshowh" _
+							,"initialthresh","threshsub","minarea","maxarea","ratio")
+	Else
+		cloumns = Array As Object("name","value")
+		cursor1 = sql_capture.QueryColumnData("dict_properties",cloumns,params,False)
+		For i = 0 To cursor1.RowCount - 1
+			cursor1.Position = i
+			If i < 9 Then
+				ltvTable_Test.AddSingleLine2(cursor1.GetString(cloumns(0))&":"&cursor1.GetString(cloumns(1)),cursor1.GetString(cloumns(1)))
+			End If
+		Next
+		lbl_Count.Text = "总数:"
+		lbl_Rate.Text = "活跃数:"
+		Return
+	End If
+	sql_capture.FlagIni()
+	cursor1 = sql_capture.QueryColumnData("resulthistory",cloumns,params,False)
+	For i = 0 To cursor1.RowCount - 1
+		cursor1.Position = i
+		If i == 0 Then
+			For j = 2 To cloumns.Length - 1
+				ltvTable_Test.AddSingleLine2(cloumns(j)&":"&cursor1.GetString(cloumns(j)),cursor1.GetString(cloumns(j)))
+			Next
+			lbl_Count.Text = "总数:"&cursor1.GetString(cloumns(0))
+			lbl_Rate.Text = "活跃数:"&cursor1.GetString(cloumns(1))
+		End If
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+End Sub
+
+'总数与活跃数的显示
+Sub Show_Count_Active
+End Sub
+
+'点击调用分析算法分析采集到的图片
+Sub btnAnay_Click
+	Dim isperm_dict_cursors As Cursor
+	Dim isperm_dict_array() As Float
+	Dim isperm_Count() As Int
+	Dim isperm_dict_cloumns() As Object 
+	Dim isperm_dict_params As Map
+	Dim isperm_dict_map As Map
+	
+	Dim timeNow As Long
+	Dim cursor1 As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	Dim id As Int
+	Dim history_params() As Object 
+	
+	isperm_dict_map.Initialize()
+	isperm_dict_params.Initialize()
+	isperm_dict_cloumns = Array As Object("name","value")
+	
+	btnEnabled_Test(False)
+	cloumns = Array As Object("ana_path")
+	params.Initialize()
+	sql_capture.FlagIni()
+	ana_history_path = ""
+	ana_capture_path = ""
+	
+	If pigid <> Null And pigid <> "" Then
+		params.Put("pigid",pigid)
+		params.Put("ana_capture_point",ana_capture_point)
+	End If
+	
+	'ltv_anay_time初始化
+	cursor1 = sql_capture.QueryColumnData("capture",cloumns,params,False)
+	For i = 0 To cursor1.RowCount - 1
+		cursor1.Position = i
+		If i == 0 Then
+			ana_capture_path = cursor1.GetString(cloumns(0))
+		End If
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+	If ana_capture_path <> "" And ana_capture_path <> Null Then
+		
+		timeNow = DateTime.Now
+		sql_capture.FlagIni()
+		ana_history_path = create_File.Create_Path_Dir(ana_capture_path,timeNow)
+		isperm_dict_cursors = sql_capture.QueryColumnData("dict_properties",isperm_dict_cloumns,isperm_dict_params,False)
+		
+		For i = 0 To isperm_dict_cursors.RowCount - 1
+			isperm_dict_cursors.Position = i
+			isperm_dict_map.put(isperm_dict_cursors.GetString(isperm_dict_cloumns(0)),isperm_dict_cursors.GetString(isperm_dict_cloumns(1)))
+		Next
+		sql_capture.CloseSQL("pigpet.db")
+		
+		If isperm_dict_map.Size > 9 Then
+			isperm_dict_array = Array As Float(isperm_dict_map.GetValueAt(0),isperm_dict_map.GetValueAt(1),isperm_dict_map.GetValueAt(2) _
+				,isperm_dict_map.GetValueAt(3),isperm_dict_map.GetValueAt(4),isperm_dict_map.GetValueAt(5),isperm_dict_map.GetValueAt(6) _
+				,isperm_dict_map.GetValueAt(7),isperm_dict_map.GetValueAt(8),isperm_dict_map.GetValueAt(9))
+		End If
+		
+		isperm_Count = isperm.returnCount(File.DirRootExternal&ana_capture_path&"/" _
+									,File.DirRootExternal&ana_history_path,isperm_dict_array)
+		'isperm_Count = Array As Int(isperm.returnCount(File.DirRootExternal&ana_capture_path&"/",File.DirRootExternal&ana_history_path _
+		'							,File.DirRootExternal&"/home/"&"SpermSettings.ini"))
+		
+		'ToastMessageShow(isperm_Count(0)&" "&isperm_Count(1),True)
+		sql_capture.FlagIni()
+		id = sql_capture.QueryIDMax("resulthistory","id")
+		history_params = Array As Object(id+1,pigid,create_File.TimeFormat(timeNow),ana_capture_point,ana_history_path,"" _
+			,isperm_Count(0),isperm_Count(1),isperm_dict_array(0),isperm_dict_array(1),isperm_dict_array(2),isperm_dict_array(3) _
+			,isperm_dict_array(4),isperm_dict_array(5),isperm_dict_array(6),isperm_dict_array(7),isperm_dict_array(8))
+		sql_capture.FlagIni()
+		sql_capture.InsertToCapture("resulthistory",history_params)
+		sql_capture.CloseSQL("pigpet.db")
+		IniListView_Time
+	Else
+		ToastMessageShow("此采集点并未采集到图片....",True)
+	End If
+	btnEnabled_Test(True)
+	Show_LtvTable
+	'ToastMessageShow(ispermInt,False)
+End Sub
+
+
+Sub ltv_pigid_ItemClick (Position As Int, Value As Object)
+	Dim strs As String
+	
+	strs = Value
+	pigid = strs.Trim()
+	
+	IniListView_Point
+	IniListView_Time
+	Show_Photo
+	Show_LtvTable
+End Sub
+'ltv_anay_point_ItemClick
+Sub ltv_anay_point_ItemClick(Position As Int, Value As Object)
+	Dim strs As String
+	
+	strs = Value
+	If strs <> Null And strs <> "" Then
+		ana_capture_point = strs
+		IniListView_Time
+		Show_Photo
+		Show_LtvTable
+	End If
+End Sub
+
+Sub ltv_anay_time_ItemClick (Position As Int, Value As Object)
+	Dim cursor_path As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	cloumns = Array As Object("ana_path")
+	params.Initialize()
+	sql_capture.FlagIni()
+	ana_history_path = ""
+	
+	If pigid <> Null And pigid <> "" Then
+		params.Put("pigid",pigid)
+		params.Put("ana_capture_point",ana_capture_point)
+		params.Put("anay_time",Value)
+	End If
+	anay_time = Value
+	'ltv_anay_time初始化
+	cursor_path = sql_capture.QueryColumnData("resulthistory",cloumns,params,False)
+	For i = 0 To cursor_path.RowCount - 1
+		cursor_path.Position = i
+		ana_history_path = cursor_path.GetString(cloumns(0))
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+	Show_LtvTable
+End Sub
+
+Sub ltvTable_Test_ItemClick (Position As Int, Value As Object)
+	
+End Sub
+'''''''#############'''''''''''
+
+'''''''#############'''''''''''
+'iniwindow
+'填充listView
+Sub fullTable
+	Dim strs As String
+	If ltvTable_Ini.Size > 0 Then
+		For i = 0 To ltvTable_Ini.Size
+			ltvTable_Ini.Clear()
+		Next
+	End If
+	
+	For i = 0 To itemMap.Size - 1
+		If i <> 0 Or itemMapKey <> Null Then
+		Else
+			lblView.Text = itemMap.GetValueAt(i)
+			itemMapKey = itemMap.GetKeyAt(i)
+		End If
+		strs = itemMap.GetKeyAt(i) &":" &itemMap.GetValueAt(i)
+		ltvTable_Ini.AddSingleLine2(strs,strs)
+	Next
+End	Sub
+
+'全局map的数据更新
+Sub mapUpdate
+	For i = 0 To itemMap.Size -1
+		If itemMap.GetKeyAt(i) == itemMapKey Then
+			'itemMap.Remove(itemMapKey)
+			itemMap.Put(itemMapKey,lblView.Text)
+		End If
+	Next
+End Sub
+
+'从数据库中读取配置写入到map
+Sub read_Table_Dict
+	Dim cursors As Cursor
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	itemMap.Initialize()
+	itemMap_Begin.Initialize()
+	params.Initialize()
+	cloumns = Array As Object("name","value")
+	
+	sql_capture.FlagIni()
+	cursors = sql_capture.QueryColumnData("dict_properties",cloumns,params,False)
+	'ToastMessageShow(cursors.RowCount,True)
+	For i = 0 To cursors.RowCount - 1
+		cursors.Position = i
+		itemMap.put(cursors.GetString(cloumns(0)),cursors.GetString(cloumns(1)))
+		itemMap_Begin.put(cursors.GetString(cloumns(0)),cursors.GetString(cloumns(1)))
+	Next
+	sql_capture.CloseSQL("pigpet.db")
+End Sub
+
+'指定字符串所在字符串中的位置
+Sub charInString(ch As String,str As String) As Int
+	Dim strs As String
+	Dim returnInt As Int
+	returnInt = -1
+	If str <> Null Then
+		If ch <> Null Then
+			strs = str.Trim()
+			If strs.Length() > 0 Then
+				For i = 0 To strs.Length() - 1
+					If strs.CharAt(i) == ch.CharAt(0) Then
+						If i <> 0 Or i <> strs.Length() -1 Then
+							returnInt = i
+						End If
+					End If
+				Next
+			End If
+		End If
+	End If
+	Return returnInt
+End Sub
+
+'保存listView上的相关改动到配置文件中
+Sub btnSave_Click
+	Dim columns As Map
+	Dim params As Map
+	
+	columns.Initialize()
+	params.Initialize()
+	sql_capture.FlagIni()
+	
+	If itemMap.Size == itemMap_Begin.Size Then
+		For i = 0 To itemMap.Size - 1
+			If itemMap.GetValueAt(i) <> itemMap_Begin.GetValueAt(i) Then
+				columns.Put("value",itemMap.GetValueAt(i))
+				params.Put("name",itemMap.GetKeyAt(i))
+				params.Put("params1","[isperm]")
+				sql_capture.UpdateToTable("dict_properties",columns,params)
+			End If
+		Next
+	End If
+	sql_capture.CloseSQL("pigpet.db")
+	Show_LtvTable
+	ToastMessageShow("保存成功...",False)
+End Sub
+
+'退出
+Sub btnExit_Ini_Click
+	camera1.StopPreview()
+	camera1.Release()
+	Activity.Finish()
+	'StartActivity("TestExp")
+End Sub
+
+Sub btnDelTen_Click
+	If lblView.Text >= 1 Then
+		lbl_text_int = lblView.Text - 10
+		If (lbl_text_int <= 0) Then
+			lblView.Text = 0
+		Else
+			lblView.Text = lbl_text_int
+		End If
+	Else
+		lbl_text_double = lblView.Text - 10 * 0.01
+		If lbl_text_double <= 0 Then
+			lblView.Text = 0
+		Else
+			lblView.Text = doubleToString(lbl_text_double)
+		End If
+	End If
+	mapUpdate
+	fullTable
+End Sub
+
+Sub btnDelOne_Click
+	If lblView.Text >= 1 Then
+		lbl_text_int = lblView.Text - 1
+		If lbl_text_int <= 0 Then
+			lblView.Text = 0
+		Else
+			lblView.Text = lbl_text_int
+		End If
+	Else
+		lbl_text_double = lblView.Text - 1 * 0.01
+		If lbl_text_double <= 0 Then
+			lblView.Text = 0
+		Else 
+			lblView.Text = doubleToString(lbl_text_double)
+		End If
+	End If
+	mapUpdate
+	fullTable
+End Sub
+
+Sub btnAddTen_Click
+	If lblView.Text >= 1 Then
+		lbl_text_int = lblView.Text + 10
+		lblView.Text = lbl_text_int
+	Else
+		lbl_text_double = lblView.Text + 10 * 0.01
+		lblView.Text = doubleToString(lbl_text_double)
+	End If
+	mapUpdate
+	fullTable
+End Sub
+
+Sub btnAddOne_Click
+	If lblView.Text >= 1 Then
+		lbl_text_int = lblView.Text + 1
+		lblView.Text = lbl_text_int
+	Else
+		lbl_text_double = lblView.Text + 1 * 0.01
+		lblView.Text = doubleToString(lbl_text_double)
+		
+	End If
+	mapUpdate
+	fullTable
+End Sub
+
+'判断double类型的长度是否大于5,大于则只保留5位
+'如0.1235648  返回0.124
+'四舍五入
+Sub doubleToString(double1 As Double) As String
+	Dim strs As String
+	strs = double1&""
+	If double1 > 1 Then
+		strs = 1
+	Else
+		If strs.Length() > 5 Then
+			strs = strs.SubString2(0,5)
+		End If
+	End If
+	Return strs
+End Sub
+
+'listView上的item单击事件
+Sub ltvTable_Ini_ItemClick (Position As Int, value As String)
+	values_Text(value)	
+End Sub
+
+'listView 不为空时,lblView.Text的值为listView的第一个item的值
+Sub lbl_Text_ltvTable
+	If ltvTable_Ini.Size > 0 Then
+		values_Text(ltvTable_Ini.GetItem(0))
+	End If
+End Sub
+
+'
+Sub values_Text(value As String)
+	Dim flagInt As Int
+	If value <> Null And value <> "" Then
+		flagInt = charInString(":",value)
+		value = value.Trim()
+		If flagInt <> -1 Then
+			'ToastMessageShow(value.SubString(flagInt+1),True)
+			lblView.Text = value.SubString(flagInt+1)
+			itemMapKey = value.SubString2(0,flagInt)
+		End If
+	End If	
+End Sub
+'''''''#############'''''''''''

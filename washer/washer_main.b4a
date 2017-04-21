@@ -1,0 +1,994 @@
+﻿Version=5.02
+NumberOfModules=3
+Module1=alipay
+Module2=myutils
+Module3=weixinpay
+Build1=Default,b4a.example
+ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: http://www.b4x.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="5" android:targetSdkVersion="14"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~SetApplicationAttribute(android:theme, "@android:style/Theme.Holo")~\n~'End of default text.~\n~
+IconFile=
+NumberOfFiles=11
+File1=fixed.bal
+File2=index.bal
+File3=my_logo.png
+File4=pay_type.bal
+File5=paymod.bal
+File6=personalized.bal
+File7=selectmod.bal
+File8=successmod.bal
+File9=t1z5xfxdxmxxxxxxxx.png
+File10=tht_index.bal
+File11=weixin_LOGO.png
+NumberOfLibraries=8
+Library1=core
+Library2=reflection
+Library3=alipay_fat
+Library4=webviewextras
+Library5=qrcodejni
+Library6=seriallibjab
+Library7=randomaccessfile
+Library8=byteconverter
+@EndOfDesignText@
+'@date 2017年4月11日14:44:21
+'@author 张阳光
+'
+#Region  Project Attributes 
+	#ApplicationLabel: washer
+	#VersionCode: 1
+	#VersionName: 
+	'SupportedOrientations possible values: unspecified, landscape or portrait.
+	#SupportedOrientations: unspecified
+	#CanInstallToExternalStorage: False
+#End Region
+
+#Region  Activity Attributes 
+	#FullScreen: True
+	#IncludeTitle: False
+#End Region
+
+Sub Process_Globals
+	'These global variables will be declared once when the application starts.
+	'These variables can be accessed from all modules.
+	
+	'定时器
+	Dim taskTime As Timer
+	'轮询查询微信支付是否成功
+	Dim taskTime2 As Timer
+End Sub
+
+Sub Globals
+	'These global variables will be redeclared each time the activity is created.
+	'These variables can only be accessed from this module.
+	''''''''''''#################'''''''''''''
+	'index.bal
+	Private btn_fixed As Button
+	Private btn_personalized As Button
+	Private btn_select As Button
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'fixed.bal
+	Private btn_fixed_back As Button
+	Private btn_fixed_cancel As Button
+	Private btn_fixed_dry As Button
+	Private btn_fixed_gentleW As Button
+	Private btn_fixed_next As Button
+	Private btn_fixed_quickW As Button
+	Private btn_fixed_rinse_dry As Button
+	Private btn_fixed_strongW As Button
+	Private btn_fixed_washW As Button
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'selectmod.bal
+	Private btn_select_back As Button
+	Private btn_select_cancel As Button
+	Private btn_select_next As Button
+	
+	Private tht_select As TabHost
+	Private lbl_select As Label
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'tht_index.bal
+	Private tht_index As TabHost
+	Private lbl_index_tht As Label
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'personalized
+	Private btn_personalized_back As Button
+	Private btn_personalized_cancel As Button
+	Private btn_personalized_next As Button
+	Private igv_personalized As ImageView
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'successmod
+	Private btn_success_ok As Button
+	Private lbl_success As Label
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'paymod
+	Private btn_pay_back As Button
+	Private btn_pay_cancel As Button
+	Private btn_pay_next As Button
+	Private igv_pay As ImageView
+	Private wv_pay_Pay As WebView
+	Private wv_pay_Ser As WebView
+	Private wv_pay_Wei As WebView
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'pay_type
+	Private igv_pay_type_ali As ImageView
+	Private igv_pay_type_my As ImageView
+	Private igv_pay_type_weixin As ImageView
+	Private lbl_pay_type As Label
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'全局对象
+	Dim wviewEx As WebViewExtras
+	Dim wviewExs As WebViewExtras
+	Dim wviewExWei As WebViewExtras
+	''''''''''''#################'''''''''''''
+	
+	''''''''''''#################'''''''''''''
+	'全局变量
+	
+	Dim current_tab As Int = 0
+	'tht_index的page数量
+	Dim current_tab_count As Int = 0
+	
+	'显示哪种二维码图片
+	'0 支付宝  1 微信   2 公司
+	Dim qr_show_flag As Int = -1
+	
+	'订单价格
+	Dim order_price As Int = 0
+	'订单描述
+	Dim order_desc As String = ""
+	
+	'载入图片
+	'0为载入公司logo
+'	'1为载入阿里二维码图片
+	Dim qrCodeShow As Int = 0
+	
+	'判断是否支付成功
+	Dim pay_Flag As Int = -1
+	
+	'头部导航栏标题
+	Dim tht_index_lbl_map As Map
+	
+	'个性化选择界面价格
+	Dim select_price_map As Map
+	'个性化选择界面标题内容
+	Dim select_lbl_text As Map
+	'暂时的价格
+	Dim temporary_price As Int = 0
+	
+	'personalized 载入什么图片的标志
+	' -1初始   1为二维码生成成功
+	Dim load_photo_flag As Int = -1
+	
+	'wv_pay_Pay载入网址标志
+	'0为开始  1 支付成功
+	Dim pay_load_url_flag = -1
+	
+	''''''''''''#################'''''''''''''
+	
+	
+	''''''''''''#################'''''''''''''
+	'panel 即selectmod
+	Dim page_button1 As RadioButton
+	Dim page_button2 As RadioButton
+	Dim page_button3 As RadioButton
+	Dim page_button4 As RadioButton
+	Dim page_button5 As RadioButton
+	Dim page_button6 As RadioButton
+	Dim page_button7 As RadioButton
+	Dim page_button8 As RadioButton
+	Dim page_button9 As RadioButton
+	Dim page_button10 As RadioButton
+	
+	''''''''''''#################'''''''''''''
+	
+	
+	''''''''''''#################'''''''''''''
+	'串口操作对象
+	Dim aSync As AsyncStreams
+	Dim usbSerial As SerialPort
+	
+	'串口参数
+	Dim SERIAL_PORT As String = ""
+	Dim SERIAL_RATE As String = "9600"
+	Dim SERIAL_NUM As Int = 2
+	
+	'返回指令分析
+	Dim serial_Return_Data As Int = 0
+	''''''''''''#################'''''''''''''
+	
+	
+End Sub
+
+Sub Activity_Create(FirstTime As Boolean)
+	'Do not forget to load the layout file created with the visual designer. For example:
+	'Activity.LoadLayout("Layout1")
+	
+	tht_index_lbl_map.Initialize()
+	tht_index_lbl_map.Put("page1","欢迎使用自动洗衣系统")
+	tht_index_lbl_map.Put("page2","固定洗衣模式有以下几种，请选择：")
+	tht_index_lbl_map.Put("page3","自定义组合模式请按步骤进行选择：")
+	tht_index_lbl_map.Put("page4","个性化请打开app，扫描下方二维码")
+	tht_index_lbl_map.Put("page5","请选择支付方式")
+	tht_index_lbl_map.Put("page6","请扫描下方二维码进行支付")
+	tht_index_lbl_map.Put("page7","支付成功，请按照提示将衣物放入制定位置")
+	
+	
+	Activity.Height = -1
+	Activity.Width = -1
+	Activity.LoadLayout("tht_index")
+	
+	alipay.saveImage(alipay.ALI_LOGO_NAME)
+	alipay.saveImage(weixinpay.WEIXIN_LOGO_NAME)
+	alipay.saveImage(alipay.MY_LOGO_NAME)
+	
+	tht_index.AddTab("","index")
+	tht_index.AddTab("","fixed")
+	tht_index.AddTab("","selectmod")
+	tht_index.AddTab("","personalized")
+	tht_index.AddTab("","pay_type")
+	tht_index.AddTab("","paymod")
+	tht_index.AddTab("","successmod")
+	
+	'tht_index.AddTab("index","index")
+	'tht_index.AddTab("fixed","fixed")
+	'tht_index.AddTab("selectmod","selectmod")
+	'tht_index.AddTab("personalized","personalized")
+	'tht_index.AddTab("pay_type","pay_type")
+	'tht_index.AddTab("paymod","paymod")
+	'tht_index.AddTab("successmod","successmod")
+	
+	
+	taskTime.Initialize("taskTime",10)
+	taskTime2.Initialize("taskTime2",10)
+	
+	
+	lbl_index_tht.Text = tht_index_lbl_map.Get("page1")
+	
+	igv_pay_type_ali.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.ALI_LOGO_NAME)
+	igv_pay_type_weixin.Bitmap = LoadBitmap(alipay.PHOTO_PATH,weixinpay.WEIXIN_LOGO_NAME)
+	igv_pay_type_my.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.MY_LOGO_NAME)
+	
+	btn_pay_next.Enabled = False
+	btn_personalized_next.Enabled = False
+	page_content
+	current_tab_count = tht_index.TabCount
+	Try
+		usbSerial.SetPort(SERIAL_PORT,SERIAL_RATE,SERIAL_NUM)
+	Catch(LastException)
+		ToastMessageShow(LastException.Message,True)
+	End Try
+	aSync.Initialize(usbSerial.InputStream,usbSerial.OutputStream,"Astreams")
+End Sub
+
+Sub Activity_Resume
+	Try
+		usbSerial.SetPort(SERIAL_PORT,SERIAL_RATE,SERIAL_NUM)
+	Catch(LastException)
+		ToastMessageShow(LastException.Message,True)
+	End Try
+	aSync.Initialize(usbSerial.InputStream,usbSerial.OutputStream,"Astreams")
+End Sub
+
+Sub Activity_Pause (UserClosed As Boolean)
+	If UserClosed Then
+		aSync.Close()
+		usbSerial.close()
+	End If
+End Sub
+
+'隐藏智能手机的功能键(虚拟按键) 返回/主页/多任务切换
+Sub ForceImmersiceMode
+	Dim r As Reflector
+	r.Target = r.GetActivity
+	r.Target = r.RunMethod("getWindow")
+	r.Target = r.RunMethod("getDecorView")
+	r.RunMethod2("setSystemUiVisibility", 5894, "java.lang.int")
+End Sub
+
+'判断当前活动是否获得焦点
+Sub Activity_WindowFocusChanged(HasFocus As Boolean)
+	If HasFocus Then
+		ForceImmersiceMode
+	End If
+End Sub
+
+
+''''''''''''''''###############'''''''''''''''''''''
+Sub btn_select_Click
+	select_lbl_text.Initialize()
+	select_lbl_text.Put("page1","请选择水量")
+	select_lbl_text.Put("page2","请选择洗涤剂")
+	select_lbl_text.Put("page3","请选择洗涤时间")
+	select_lbl_text.Put("page4","请选择洗涤次数")
+	select_lbl_text.Put("page5","请选择脱水次数")
+	lbl_select.Text = select_lbl_text.Get("page1")
+	select_price_map.Initialize()
+	tht_select.CurrentTab = 0
+	tht_index.CurrentTab = 2
+End Sub
+Sub btn_personalized_Click
+	taskTime.Enabled = False
+	'返回值 1  二维码生成成功
+	load_photo_flag = alipay.QRCODE.returnSucOrFail("hggghttffght",alipay.PHOTO_PATH,alipay.MACHINE_QR_CODE_INFI,alipay.QRCODE_WIDTH_HEIGHT)
+	taskTime.Enabled = True
+	tht_index.CurrentTab = 3
+End Sub
+Sub btn_fixed_Click
+	tht_index.CurrentTab = 1
+End Sub
+
+''''''''''''''''###############'''''''''''''''''''''
+'洁桶洗
+Sub btn_fixed_washW_Click
+	order_price = 1
+	order_desc = "洁桶洗"
+End Sub
+'强力洗
+Sub btn_fixed_strongW_Click
+	order_price = 5
+	order_desc = "强力洗"
+End Sub
+'漂洗+脱水
+Sub btn_fixed_rinse_dry_Click
+	order_price = 4
+	order_desc = "漂洗+脱水"
+End Sub
+'快速洗
+Sub btn_fixed_quickW_Click
+	order_price = 3
+	order_desc = "快速洗"
+End Sub
+'轻柔洗
+Sub btn_fixed_gentleW_Click
+	order_price = 3
+	order_desc = "轻柔洗"
+End Sub
+'单脱水
+Sub btn_fixed_dry_Click
+	order_price = 2
+	order_desc = "单脱水"
+End Sub
+
+
+Sub btn_fixed_next_Click
+	Dim return_str As String = ""
+	Dim order_num As String = ""
+	
+	Dim url_str As String = ""
+	
+	If order_price <> 0 Then
+		order_num = alipay.ORDERNUM&DateTime.Now
+		return_str = alipay.aliQrCode(order_num,order_price,order_desc)
+		wviewEx.addJavascriptInterface(wv_pay_Pay,"B4A")
+		wv_pay_Pay.LoadHtml(return_str)
+		
+		url_str = "http://www.k91d.com/weixinpay/example/mynative.php?check_flag=yangguangzyg&body=" _
+				&order_desc&"&attach="&order_desc&"&out_trade_no="&order_num&"&total_fee="&order_price
+		wviewExWei.addJavascriptInterface(wv_pay_Wei,"B4A")
+		'ToastMessageShow(url_str,True)
+		wv_pay_Wei.LoadUrl(url_str)
+		
+		url_str = "http://www.k91d.com/service/index.php?head=0527&type=ter&data=" _
+				&order_num&":"&order_desc&":1:1:-1:-1:zgyhtfg34dde:"&order_price
+		'ToastMessageShow(url_str,True)
+		wviewExs.addJavascriptInterface(wv_pay_Ser,"B4A")
+		wv_pay_Ser.LoadUrl(url_str)
+		pay_load_url_flag = 0
+		taskTime.Enabled = True
+		current_tab = 1
+		tht_index.CurrentTab = 4
+	Else
+		ToastMessageShow("请选择清洗模式",True)
+	End If
+End Sub
+Sub btn_fixed_cancel_Click
+	tht_index.CurrentTab = 0
+	processInit
+End Sub
+Sub btn_fixed_back_Click
+	tht_index.CurrentTab = 0
+	processInit
+End Sub
+
+''''''''''''''''###############'''''''''''''''''''''
+Sub btn_select_next_Click
+	If page_button1.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"水：15L；"
+	End If
+	If page_button2.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"水：20L；"
+	End If
+	If page_button3.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"洗涤剂：洗衣粉；"
+	End If
+	If page_button4.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"洗涤剂：洗衣液；"
+	End If
+	If page_button5.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"洗涤时间：30min；"
+	End If
+	If page_button6.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"洗涤时间：60min；"
+	End If
+	If page_button7.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"洗涤次数：1；"
+	End If
+	If page_button8.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"洗涤次数：3；"
+	End If
+	If page_button9.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"脱水次数：1；"
+	End If
+	If page_button10.Checked == True Then
+		temporary_price = temporary_price + 1
+		order_desc = order_desc&"脱水次数：3；"
+	End If
+	
+	Dim return_str As String = ""
+	Dim order_num As String = ""
+	
+	If temporary_price <> 0 Then
+		order_num = alipay.ORDERNUM&DateTime.Now
+		return_str = alipay.aliQrCode(order_num,temporary_price,order_desc)
+		wviewEx.addJavascriptInterface(wv_pay_Pay,"B4A")
+		wv_pay_Pay.LoadHtml(return_str)
+		
+		wviewExWei.addJavascriptInterface(wv_pay_Wei,"B4A")
+		wv_pay_Wei.LoadUrl("http://www.k91d.com/weixinpay/example/mynative.php?check_flag=yangguangzyg&body=" _
+				&order_desc&"&attach="&order_desc&"&out_trade_no="&order_num&"&total_fee="&temporary_price)
+		
+		'wv_pay_Ser.LoadUrl("http://www.k91d.com/server/index.php?head=0527&type=su&data=" _
+		'		&order_num&":"&order_desc&":0:0:::"&temporary_price)
+		wviewExs.addJavascriptInterface(wv_pay_Ser,"B4A")
+		wv_pay_Ser.LoadUrl("http://www.k91d.com/service/index.php?head=0527&type=ter&data=" _
+				&order_num&":"&order_desc&":1:1:-1:-1:zgyhtfg34dde:"&temporary_price)
+		pay_load_url_flag = 0
+		taskTime.Enabled = True
+		current_tab = 2
+		tht_index.CurrentTab = 4
+	End If
+	'Dim pl As Panel
+	'Dim lbl_edit As Label
+	'pl.Initialize("pl")
+	'lbl_edit.Initialize("lbl_edit")
+	'lbl_edit.Text = "dddddddddddddddddd"&DateTime.Now
+	'pl.AddView(lbl_edit,0,0,400,400)
+	'lbl_select.Text = "dddsasdsafad"
+	'lbl_select.TextColor = Colors.Red
+	'lbl_select.TextSize = 20
+	'lbl_select.Width = 1024dip
+	'lbl_select.Height = 70dip
+	'tht_select.AddTab2("3",pl)
+	
+	'temporary_price = 1
+End Sub
+Sub btn_select_cancel_Click
+	tht_index.CurrentTab = 0
+	processInit
+End Sub
+Sub btn_select_back_Click
+	tht_index.CurrentTab = 0
+	processInit
+End Sub
+
+Sub page_content
+	Dim pl As Panel
+	Dim pl2 As Panel
+	Dim pl3 As Panel
+	Dim pl4 As Panel
+	Dim pl5 As Panel
+	
+	Dim page_label1 As Label
+	Dim page_label2 As Label
+	Dim page_label3 As Label
+	Dim page_label4 As Label
+	Dim page_label5 As Label
+	Dim page_label6 As Label
+	Dim page_label7 As Label
+	Dim page_label8 As Label
+	Dim page_label9 As Label
+	Dim page_label10 As Label
+	
+	Dim page_btn_back1 As Button
+	Dim page_btn_next1 As Button
+	Dim page_btn_back2 As Button
+	Dim page_btn_next2 As Button
+	Dim page_btn_back3 As Button
+	Dim page_btn_next3 As Button
+	Dim page_btn_back4 As Button
+	Dim page_btn_next4 As Button
+	Dim page_btn_back5 As Button
+	Dim page_btn_next5 As Button
+	
+	
+	pl.Initialize("pl")
+	pl2.Initialize("pl2")
+	pl3.Initialize("pl3")
+	pl4.Initialize("pl4")
+	pl5.Initialize("pl5")
+	
+	page_button1.Initialize("page_button1")
+	page_button2.Initialize("page_button2")
+	page_button3.Initialize("page_button3")
+	page_button4.Initialize("page_button4")
+	page_button5.Initialize("page_button5")
+	page_button6.Initialize("page_button6")
+	page_button7.Initialize("page_button7")
+	page_button8.Initialize("page_button8")
+	page_button9.Initialize("page_button9")
+	page_button10.Initialize("page_button10")
+	
+	page_label1.Initialize("page_label1")
+	page_label2.Initialize("page_label2")
+	page_label3.Initialize("page_label3")
+	page_label4.Initialize("page_label4")
+	page_label5.Initialize("page_label5")
+	page_label6.Initialize("page_label6")
+	page_label7.Initialize("page_label7")
+	page_label8.Initialize("page_label8")
+	page_label9.Initialize("page_label9")
+	page_label10.Initialize("page_label0")
+	
+	page_btn_back1.Initialize("page_btn_back1")
+	page_btn_next1.Initialize("page_btn_next1")
+	page_btn_back2.Initialize("page_btn_back2")
+	page_btn_next2.Initialize("page_btn_next2")
+	page_btn_back3.Initialize("page_btn_back3")
+	page_btn_next3.Initialize("page_btn_next3")
+	page_btn_back4.Initialize("page_btn_back4")
+	page_btn_next4.Initialize("page_btn_next4")
+	page_btn_back5.Initialize("page_btn_back5")
+	page_btn_next5.Initialize("page_btn_next5")
+	
+	page_button1.Checked = True
+	page_button3.Checked = True
+	page_button5.Checked = True
+	page_button7.Checked = True
+	page_button9.Checked = True
+	
+	page_btn_back1.Text = "返回"
+	page_btn_back1.TextSize = "20"
+	page_btn_next1.Text = "其他"
+	page_btn_next1.TextSize = "20"
+	page_btn_back2.Text = "返回"
+	page_btn_back2.TextSize = "20"
+	page_btn_next2.Text = "其他"
+	page_btn_next2.TextSize = "20"
+	page_btn_back3.Text = "返回"
+	page_btn_back3.TextSize = "20"
+	page_btn_next3.Text = "其他"
+	page_btn_next3.TextSize = "20"
+	page_btn_back4.Text = "返回"
+	page_btn_back4.TextSize = "20"
+	page_btn_next4.Text = "其他"
+	page_btn_next4.TextSize = "20"
+	page_btn_back5.Text = "返回"
+	page_btn_back5.TextSize = "20"
+	page_btn_next5.Text = "其他"
+	page_btn_next5.TextSize = "20"
+	
+	page_label1.Text = "15L"
+	page_label2.Text = "20L"
+	page_label3.Text = "洗衣粉"
+	page_label4.Text = "洗衣液"
+	page_label5.Text = "30min"
+	page_label6.Text = "60min"
+	page_label7.Text = "1次"
+	page_label8.Text = "3次"
+	page_label9.Text = "1次"
+	page_label10.Text = "2次"
+	
+	pl.AddView(page_button1,0,0,30,20)
+	pl.AddView(page_button2,0,100,30,20)
+	pl.AddView(page_label1,40,0,500,40)
+	pl.AddView(page_label2,40,100,500,40)
+	pl2.AddView(page_button3,0,0,30,20)
+	pl2.AddView(page_button4,0,100,30,20)
+	pl2.AddView(page_label3,40,0,500,40)
+	pl2.AddView(page_label4,40,100,500,40)
+	pl3.AddView(page_button5,0,0,30,20)
+	pl3.AddView(page_button6,0,100,30,20)
+	pl3.AddView(page_label5,40,0,500,40)
+	pl3.AddView(page_label6,40,100,500,40)
+	pl4.AddView(page_button7,0,0,30,20)
+	pl4.AddView(page_button8,0,100,30,20)
+	pl4.AddView(page_label7,40,0,500,40)
+	pl4.AddView(page_label8,40,100,500,40)
+	pl5.AddView(page_button9,0,0,30,20)
+	pl5.AddView(page_button10,0,100,30,20)
+	pl5.AddView(page_label9,40,0,500,40)
+	pl5.AddView(page_label10,40,100,500,40)
+	
+	pl.AddView(page_btn_back1,0,500,100,50)
+	pl.AddView(page_btn_next1,800,500,100,50)
+	pl2.AddView(page_btn_back2,0,500,100,50)
+	pl2.AddView(page_btn_next2,800,500,100,50)
+	pl3.AddView(page_btn_back3,0,500,100,50)
+	pl3.AddView(page_btn_next3,800,500,100,50)
+	pl4.AddView(page_btn_back4,0,500,100,50)
+	pl4.AddView(page_btn_next4,800,500,100,50)
+	pl5.AddView(page_btn_back5,0,500,100,50)
+	pl5.AddView(page_btn_next5,800,500,100,50)
+	
+	lbl_select.TextColor = Colors.Red
+	lbl_select.TextSize = 20
+	tht_select.AddTab2("",pl)
+	tht_select.AddTab2("",pl2)
+	tht_select.AddTab2("",pl3)
+	tht_select.AddTab2("",pl4)
+	tht_select.AddTab2("",pl5)
+	
+End Sub
+
+Sub lbl_select_Click
+	'ToastMessageShow("44444444444",True)
+End Sub
+
+Sub page_btn_back1_Click
+	tht_select.CurrentTab = 0
+End Sub
+Sub page_btn_next1_Click
+	tht_select.CurrentTab = 1
+End Sub
+Sub page_btn_back2_Click
+	tht_select.CurrentTab = 0
+End Sub
+Sub page_btn_next2_Click
+	tht_select.CurrentTab = 2
+End Sub
+Sub page_btn_back3_Click
+	tht_select.CurrentTab = 1
+End Sub
+Sub page_btn_next3_Click
+	tht_select.CurrentTab = 3
+End Sub
+Sub page_btn_back4_Click
+	tht_select.CurrentTab = 2
+End Sub
+Sub page_btn_next4_Click
+	tht_select.CurrentTab = 4
+End Sub
+Sub page_btn_back5_Click
+	tht_select.CurrentTab = 3
+End Sub
+Sub page_btn_next5_Click
+	tht_select.CurrentTab = 4
+End Sub
+
+
+Sub tht_select_TabChanged
+	Dim ss As Int = 0
+	ss = tht_select.TabCount
+	If ss > 0 Then
+		For i = 0 To ss Step 1
+			If tht_select.CurrentTab == i Then
+				lbl_select.Text = select_lbl_text.Get("page"&(i+1))
+			End If	
+		Next
+	End If
+	
+End Sub
+''''''''''''''''###############'''''''''''''''''''''
+Sub tht_index_TabChanged
+	'ToastMessageShow("dd",True)
+	If current_tab_count > 0 Then
+		For i = 0 To current_tab_count Step 1
+			If tht_index.CurrentTab == i Then
+				lbl_index_tht.Text = tht_index_lbl_map.Get("page"&(i+1))
+			End If	
+		Next
+	End If
+End Sub
+
+''''''''''''''''###############'''''''''''''''''''''
+Sub btn_personalized_next_Click
+	current_tab = 3
+	tht_index.CurrentTab = 4
+End Sub
+Sub btn_personalized_cancel_Click
+	tht_index.CurrentTab = 0
+	processInit
+End Sub
+Sub btn_personalized_back_Click
+	tht_index.CurrentTab = 0
+	processInit
+End Sub
+
+''''''''''''''''###############'''''''''''''''''''''
+Sub btn_success_ok_Click
+	ToastMessageShow("支付成功，请放入衣物……",True)
+End Sub
+
+''''''''''''''''###############'''''''''''''''''''''
+Sub btn_pay_next_Click
+	If current_tab_count > 0 Then
+		tht_index.CurrentTab = current_tab_count - 1
+	End If
+End Sub
+Sub btn_pay_cancel_Click
+	tht_index.CurrentTab = 0
+	processInit
+End Sub
+Sub btn_pay_back_Click
+	tht_index.CurrentTab = current_tab
+	'processInit
+End Sub
+Sub wv_pay_Ser_PageFinished (Url As String)
+	Dim jsStatement As String
+	jsStatement = "B4A.CallSub('serverHTML',false,document.documentElement.outerHTML)"
+	wviewEx.executeJavascript(wv_pay_Ser,jsStatement)
+End Sub
+Sub wv_pay_Pay_PageFinished (Url As String)
+	Dim jsStatement As String
+	jsStatement = "B4A.CallSub('processHTML',false,document.documentElement.outerHTML)"
+	wviewEx.executeJavascript(wv_pay_Pay,jsStatement)
+End Sub
+Sub wv_pay_Wei_PageFinished (Url As String)
+	Dim jsStatement As String
+	jsStatement = "B4A.CallSub('weiXinHtml',false,document.documentElement.outerHTML)"
+	wviewEx.executeJavascript(wv_pay_Wei,jsStatement)
+End Sub
+
+Sub serverHTML(html As String)
+	'ToastMessageShow(html,True)
+End Sub
+
+Sub weiXinHtml(html As String)
+	'提取微信二维码
+	'生成微信二维码图片
+	'ToastMessageShow(html,True)
+	qrCodeShow = weixinpay.qrCodeFromHtml(html)
+	
+End Sub
+
+Sub processHTML(html As String)
+	Dim parms_map As Map
+	Dim sb_url As StringBuilder
+	
+	sb_url.Initialize()
+	parms_map.Initialize()
+	
+	If pay_load_url_flag == 0 Then
+		'取得二维码信息
+		qrCodeShow = alipay.getQrCodeFromHtml(html)
+		'取得支付成功信息
+		pay_Flag = alipay.getSuccessFromHtml(html)
+	
+		'支付成功，提取相关订单数据
+		If pay_Flag <> -1 Then
+			ToastMessageShow(html,True)
+			'浏览器自动转换'&'为'&amp;'
+			html = html.Replace("&amp;","&")
+			ToastMessageShow(html,True)
+			parms_map = myutils.getOrderData(html)
+			pay_load_url_flag = 1
+			If parms_map <> Null And parms_map.Size > 0 Then
+				sb_url.Append("http://www.k91d.com/service/index.php?head=0527&type=ter&data=")
+				sb_url.Append(parms_map.Get("out_trade_no")).Append(":")
+				sb_url.Append(parms_map.Get("body")).Append(":")
+				'订单类型???????
+				sb_url.Append("1").Append(":")
+				'订单状态  -1没有  1开始  2进行  3完成
+				sb_url.Append("1").Append(":")
+				'支付宝用户  buyer_email  buyer_id
+				sb_url.Append(parms_map.Get("buyer_email")).Append(":")
+				'用户类型 1 平台用户  2支付宝  3微信
+				sb_url.Append("2").Append(":")
+				'机器码：机器唯一标识
+				sb_url.Append("00000000001").Append(":")
+				sb_url.Append(parms_map.Get("total_fee"))
+			Else
+				sb_url.Append("http://www.k91d.com/service/index.php?head=0527&type=ter&data=-1:-1:-1:-1:-1:-1:-1:-1")
+			End If
+			'ToastMessageShow(sb_url,True)
+			wviewEx.addJavascriptInterface(wv_pay_Ser,"B4A")
+			wv_pay_Ser.LoadUrl(sb_url.ToString())
+		End If
+	End If
+End Sub
+
+'定时器任务
+Sub taskTime_Tick
+	If qrCodeShow == 0 Then
+		igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.ALI_LOGO_NAME)
+		'ToastMessageShow("1",True)
+	End If
+	If qrCodeShow == 1 Then
+		If qr_show_flag == 0 Then
+			igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.QR_CODE_LOGO)
+		Else If qr_show_flag == 1 Then
+			igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,weixinpay.QR_NAME_WEIXIN)
+			'ToastMessageShow("微信",True)
+		Else If qr_show_flag == 2 Then
+			'igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.QR_CODE_LOGO)	
+			ToastMessageShow("公司",True)
+		End If
+		'igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.QR_CODE_LOGO)
+		'ToastMessageShow("2",True)
+		'taskTime.Enabled = False
+	End If
+	If pay_Flag <> -1 Then
+		If current_tab_count > 0 Then
+			tht_index.CurrentTab = current_tab_count - 1
+		End If
+		processInit
+		taskTime.Enabled = False
+		'ToastMessageShow("3",True)
+	End If
+	
+	If load_photo_flag == 1 Then
+		igv_personalized.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.MACHINE_QR_CODE_INFI)
+		taskTime.Enabled = False
+	Else
+		igv_personalized.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.ALI_LOGO_NAME)
+	End If
+End Sub
+
+Sub taskTime2_Tick
+	If pay_Flag <> -1 Then
+		If current_tab_count > 0 Then
+			tht_index.CurrentTab = current_tab_count - 1
+		End If
+		processInit
+		taskTime.Enabled = False
+		'ToastMessageShow("3",True)
+	End If
+End Sub
+
+'所有的全局变量初始化
+Sub processInit
+	current_tab = 0
+	order_price = 0
+	order_desc = ""
+	qrCodeShow = 0
+	pay_Flag = -1
+	temporary_price = 0
+	pay_load_url_flag = -1
+	load_photo_flag = -1
+End Sub
+
+''''''''''''''''###############'''''''''''''''''''''
+Sub igv_pay_type_weixin_Click
+	qr_show_flag = 1
+	current_tab = tht_index.CurrentTab
+	'ToastMessageShow(current_tab_count,True)
+	If current_tab_count - 1 > 0 Then
+		tht_index.CurrentTab = current_tab_count - 2
+		'ToastMessageShow("dddddd",True)
+	End If
+End Sub
+Sub igv_pay_type_my_Click
+	qr_show_flag = 2
+	current_tab = tht_index.CurrentTab
+	If current_tab_count - 1 > 0 Then
+		tht_index.CurrentTab = current_tab_count - 2
+	End If
+End Sub
+Sub igv_pay_type_ali_Click
+	qr_show_flag = 0
+	current_tab = tht_index.CurrentTab
+	If current_tab_count - 1 > 0 Then
+		tht_index.CurrentTab = current_tab_count - 2
+	End If
+End Sub
+
+
+'发送指令
+Sub send_Cmd(cmd As String)
+	Dim byteArray(0) As Byte
+	Dim aStr As ByteConverter
+	'Dim cmd_type As String
+	
+	If cmd.Length < 22 Then
+		Return
+	End If
+	'发送指令给下位机
+	byteArray = aStr.HexToBytes(cmd)
+	aSync.Write(byteArray)
+	
+	'cmd_type = cmd.SubString2(2,8)
+	'ToastMessageShow(cmd_type,True)
+End Sub
+
+'解析下位机的数据
+Sub recevie_Cmd(cmd_Recevie As String)
+	Select cmd_Recevie.SubString2(10,16)
+		'握手返回
+		Case "03434f"
+			serial_Return_Data = 1
+		'托盘响应
+		Case "030102"
+			serial_Return_Data = 2
+		'电源和LED开关控制
+		Case "030201","030202","030203","030204","030205"
+			serial_Return_Data = 3
+		'恒温温度控制
+		Case "030301"
+			'恒温模块开启
+			If cmd_Recevie.SubString2(18,20) == "00" Then
+				serial_Return_Data = 4
+			End If
+			'恒温模块关闭
+			serial_Return_Data = 5
+		'恒温模块设置
+		Case "030302"
+			serial_Return_Data = 6
+		'恒温温度上报
+		Case "040302"
+			serial_Return_Data = 7	
+		'载玻片温度上报
+		Case "040303"
+			serial_Return_Data = 8
+		'适配器上报
+		Case "040401"
+			serial_Return_Data = 9
+		'电池上报
+		Case "040402"
+			serial_Return_Data = 10
+		'关机指令响应
+		Case "030502"
+			serial_Return_Data = 11
+		'关机指令上报
+		Case "040501"
+			serial_Return_Data = 12	
+		'错误指令不做处理
+		Case Else
+			serial_Return_Data = 13
+	End Select
+End Sub
+
+'数据操作(接收下位机传输的数据)
+Sub Astreams_NewData(Buffer() As Byte)
+	Dim cmd_Recevie As String
+	Dim conv As ByteConverter
+	
+	'AA5508001001434f4e544d
+	cmd_Recevie = conv.HexFromBytes(Buffer).ToLowerCase()
+	
+	'ToastMessageShow(cmd_Recevie,True)
+	
+	If cmd_Recevie.Length() < 22 Then
+		Return
+	End If
+	recevie_Cmd(cmd_Recevie)
+	
+	If serial_Return_Data <> 0 Then
+		excu_Cmd_Data
+	End If
+	'ToastMessageShow("通信成功",True)
+	
+	'ToastMessageShow("Success...",True)
+End Sub
+
+'数据错误
+Sub Astreams_Error()
+	ToastMessageShow(LastException.Message,True)
+End Sub
+
+'根据返回指令类型,判断执行什么动作
+Sub excu_Cmd_Data 
+	'执行具体的操作
+	'serial_Return_Data = 0
+End Sub

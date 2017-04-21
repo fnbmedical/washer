@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+    <doclet-version-NOT-library-version>1.02</doclet-version-NOT-library-version>
+    <class>
+        <name>com.example.ispermcpp.IspermCpp</name>
+        <shortname>IspermCpp</shortname>
+        <owner>process</owner>
+        <method>
+            <name>returnActiveCount</name>
+            <comment></comment>
+            <returntype>int</returntype>
+            <parameter>
+                <name>photoPath</name>
+                <type>java.lang.String</type>
+            </parameter>
+            <parameter>
+                <name>path</name>
+                <type>java.lang.String</type>
+            </parameter>
+            <parameter>
+                <name>params_map</name>
+                <type>float[]</type>
+            </parameter>
+        </method>
+        <method>
+            <name>returnCount</name>
+            <comment></comment>
+            <returntype>int[]</returntype>
+            <parameter>
+                <name>photoPath</name>
+                <type>java.lang.String</type>
+            </parameter>
+            <parameter>
+                <name>path</name>
+                <type>java.lang.String</type>
+            </parameter>
+            <parameter>
+                <name>params_map</name>
+                <type>float[]</type>
+            </parameter>
+        </method>
+    </class>
+    <version>1.0</version>
+</root>

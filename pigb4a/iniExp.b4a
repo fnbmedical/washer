@@ -1,0 +1,444 @@
+﻿Version=5.02
+NumberOfModules=4
+Module1=sql_capture
+Module2=create_File
+Module3=TestExp
+Module4=IniExp
+Build1=Default,ini.guib4a.example
+ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: http://www.b4x.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="5" android:targetSdkVersion="14"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~SetApplicationAttribute(android:theme, "@android:style/Theme.Holo")~\n~'End of default text.~\n~
+IconFile=
+NumberOfFiles=4
+File1=iniwindow.bal
+File2=mainWindow.bal
+File3=pigpet.db
+File4=testWindow.bal
+NumberOfLibraries=9
+Library1=core
+Library2=sql
+Library3=acl
+Library4=seriallibjab
+Library5=randomaccessfile
+Library6=reflection
+Library7=byteconverter
+Library8=ispermcpp
+Library9=javaobject
+@EndOfDesignText@
+'author:张阳光
+'Created on 2017年2月6日
+#Region  Project Attributes 
+	#ApplicationLabel: IspermTest
+	#VersionCode: 1
+	#VersionName: 
+	'SupportedOrientations possible values: unspecified, landscape or portrait.
+	#SupportedOrientations: unspecified
+	#CanInstallToExternalStorage: True
+#End Region
+
+#Region  Activity Attributes 
+	#FullScreen: True
+	#IncludeTitle: True
+#End Region
+
+Sub Process_Globals
+	'These global variables will be declared once when the application starts.
+	'These variables can be accessed from all modules.
+	Dim taskTime As Timer
+	Dim taskTime2 As Timer
+End Sub
+
+Sub Globals
+	'These global variables will be redeclared each time the activity is created.
+	'These variables can only be accessed from this module.
+	
+	Private btnAnay As Button
+	Private btnCapture As Button
+	Private btnExit As Button
+	Private ltvCapture As ListView
+	Private palShowRadio As Panel
+	
+	Dim usbSerial1 As SerialPort
+	Dim aSync As AsyncStreams
+	'Dim OS As OperatingSystem
+	
+	Dim camera1 As AdvancedCamera
+	
+	Dim flag_Picture As Boolean
+	Dim flag_Task As Boolean = True
+	
+	'图片存储路径
+	Dim strPath As String
+	'第几张图片
+	Dim photo_num As Int 
+	'图片总数
+	Dim photo_Count As Int = 20
+	'图片采集完成时间
+	Dim ana_time As String
+	'采集点数目
+	Dim ana_Point_Num As Int = 4
+	'采集点记数
+	Dim ana_Point_Num_Count As Int
+	'采集样本编号
+	Dim pigid As Int = 10000
+	
+	'返回指令分析
+	Dim serial_Return_Data As Int = 0
+	
+	Dim SERIAL_PORT As String = "/dev/ttyAMA2"
+	Dim SERIAL_RATE As String = "9600"
+	Dim SERIAL_NUM As Int = 2
+End Sub
+
+'隐藏智能手机的功能键(虚拟按键) 返回/主页/多任务切换
+Sub ForceImmersiceMode
+	Dim r As Reflector
+	r.Target = r.GetActivity
+	r.Target = r.RunMethod("getWindow")
+	r.Target = r.RunMethod("getDecorView")
+	r.RunMethod2("setSystemUiVisibility", 5894, "java.lang.int")
+End Sub
+
+'判断当前活动是否获得焦点
+Sub Activity_WindowFocusChanged(HasFocus As Boolean)
+	If HasFocus Then
+		ForceImmersiceMode
+	End If
+End Sub
+
+Sub Activity_Create(FirstTime As Boolean)
+	'Do not forget to load the layout file created with the visual designer. For example:
+	'Activity.LoadLayout("Layout1")
+	Activity.LoadLayout("mainWindow")
+	Dim jo As JavaObject = Activity
+   	Dim e As Object = jo.CreateEvent("android.view.View.OnSystemUiVisibilityChangeListener", "VisibilityChanged", Null)
+   	jo.RunMethod("setOnSystemUiVisibilityChangeListener", Array As Object(e))
+	
+	Activity.Width = -1
+	Activity.Height = -1
+	Activity.Title = "采集"
+	'create_File.Create_File_Home()
+	CreateTable
+	
+	Try
+		usbSerial1.SetPort(SERIAL_PORT,SERIAL_RATE,SERIAL_NUM)
+	Catch(LastException)
+		ToastMessageShow(LastException.Message,True)
+	End Try
+	aSync.Initialize(usbSerial1.InputStream,usbSerial1.OutputStream,"Astreams")
+End Sub
+
+Sub Activity_Resume
+	CreateTable
+	camera1.Initialize(palShowRadio,"Camera1")
+	
+	Try
+		usbSerial1.SetPort(SERIAL_PORT,SERIAL_RATE,SERIAL_NUM)
+	Catch(LastException)
+		ToastMessageShow(LastException.Message,True)
+	End Try
+	aSync.Initialize(usbSerial1.InputStream,usbSerial1.OutputStream,"Astreams")
+	
+End Sub
+
+'开启相机
+Sub Camera1_Ready(Success As Boolean)
+	'横屏
+	If Activity.Width > Activity.Height Then
+		Try
+			camera1.OriLandscape()
+		Catch
+			Msgbox(LastException.Message,"设置错误...")
+		End Try
+	'竖屏
+	Else
+		Try
+			camera1.OriPortrait()
+		Catch
+			Msgbox(LastException,"设置错误...")
+		End Try
+	End If
+	
+	If Success Then
+		camera1.PictureSize(640,480)
+		camera1.StartPreview()
+	Else
+		ToastMessageShow("无法开启相机....",True)
+	End If
+End Sub
+
+'相机拍摄
+Sub Camera1_PictureTaken(Data() As Byte)
+	Dim out As OutputStream
+	Dim str_num As String
+	'ToastMessageShow(strPath,True)
+	taskTime.Enabled = False
+	camera1.PictureSize(640,480)
+	camera1.StartPreview()
+	'camera1.setResolution(200,320)
+	If photo_num < 10 Then
+		str_num = "00"&photo_num
+	Else
+		str_num = "0"&photo_num
+	End If
+	
+	out = File.OpenOutput(File.DirRootExternal&strPath, str_num&".jpg", False)
+	out.WriteBytes(Data, 0, Data.Length)
+	out.Close
+	
+	If photo_num >= photo_Count Then
+		flag_Picture = False
+		taskTime.Enabled = False
+		flag_Task = True
+		ana_Point_Num_Count = ana_Point_Num_Count + 1
+	Else
+		flag_Picture = True
+		taskTime.Enabled = True
+		
+	End If
+	photo_num = photo_num + 1
+End Sub
+
+Sub Activity_Pause (UserClosed As Boolean)
+	camera1.StopPreview()
+	camera1.Release()
+	If UserClosed Then
+		aSync.Close()
+		usbSerial1.close()
+	End If
+End Sub
+
+'退出
+Sub btnExit_Click
+	camera1.StopPreview()
+	camera1.Release()
+	Activity.Finish()
+End Sub
+
+Sub btnEnabled(flag_Enabled As Boolean)
+	btnAnay.Enabled = flag_Enabled
+	btnCapture.Enabled = flag_Enabled
+	btnExit.Enabled = flag_Enabled
+End Sub
+
+Sub taskTime_Tick
+	If flag_Picture Then
+		flag_Picture = False
+		camera1.TakePicture()
+	End If
+End Sub
+
+Sub taskTime2_Tick
+	
+	If ana_Point_Num_Count == ana_Point_Num Then
+		taskTime2.Enabled = False
+		btnEnabled(True)
+		Return
+	End If
+	
+	If flag_Task Then
+		flag_Task = False
+		photo_Point	
+	End If
+End Sub
+
+'根据采集点执行拍照
+Sub photo_Point
+	
+	If ana_Point_Num_Count == 0 Then 
+		sql_capture.FlagIni()
+		pigid = sql_capture.QueryIDMax("capture","pigid")
+		'send_Cmd("AA5508001001010200001c")
+		photo_Save(pigid,ana_Point_Num_Count + 1)
+	End If
+	'先置初始位置，再移动托盘
+	If ana_Point_Num_Count == 1 Then 
+		'send_Cmd("AA5508001001010200001c")
+		'send_Cmd("AA55080010010102001935")
+		photo_Save(pigid,ana_Point_Num_Count + 1)
+	End If
+	
+	If ana_Point_Num_Count == 2 Then 
+		'send_Cmd("AA5508001001010200001c")
+		'send_Cmd("AA5508001001010200324e")
+		photo_Save(pigid,ana_Point_Num_Count + 1)
+	End If
+	
+	If ana_Point_Num_Count == 3 Then 
+		'send_Cmd("AA5508001001010200001c")
+		'send_Cmd("AA55080010010102004b67")
+		photo_Save(pigid,ana_Point_Num_Count + 1)
+	End If
+End Sub
+
+'点击采集图片，将相关信息存储到数据库中
+'四个点 问题尚未解决
+Sub btnCapture_Click
+	'Dim pigid As Int
+	'握手
+	send_Cmd("AA5508001001434f4e544d")
+	'握手成功继续，不成功则不去拍照
+	'If serial_Return_Data <> 1 Then
+	'	Return
+	'End If
+	'serial_Return_Data为2时去拍照片
+	ana_Point_Num_Count = 0
+	'If taskTime.IsInitialized Then
+	taskTime.Initialize("taskTime",250)
+	taskTime2.Initialize("taskTime2",250)
+	taskTime2.Enabled = True
+	'End If	
+	btnEnabled(False)
+	
+	excu_Cmd_Data
+End Sub
+
+'拍照
+Sub photo_Save(pigid_Save As Int,i_params As Int)
+	Dim id As Int
+	
+	Dim timeNow As Long
+	Dim params() As Object 
+	
+	photo_num = 0
+	flag_Picture = True
+	
+	timeNow = DateTime.Now
+	strPath = create_File.Create_Dir(timeNow)
+	ana_time = create_File.TimeFormat(timeNow)
+	taskTime.Enabled = True
+	'camera1.TakePicture()
+	
+	id = sql_capture.QueryIDMax("capture","id")
+		
+	params = Array As Object(id+1,pigid_Save+1,ana_time,i_params,strPath,0,0,0,1)
+	sql_capture.InsertToCapture("capture",params)
+	
+	CreateTable
+End Sub
+
+'点击跳到调试
+Sub btnAnay_Click
+	camera1.StopPreview()
+	camera1.Release()
+	'Activity.Finish()
+	StartActivity(TestExp)
+	
+End Sub
+
+'调用数据库数据填充到listView
+Sub CreateTable
+	Dim cursors As Cursor
+	Dim strs As String 
+	Dim cloumns() As Object 
+	Dim params As Map
+	
+	ltvCapture.Clear()
+	cloumns = Array As Object("pigid","ana_time")
+	params.Initialize()
+	sql_capture.FlagIni()
+	
+	cursors = sql_capture.QueryColumnData("capture",cloumns,params,False)
+	'ToastMessageShow(cursors.RowCount,False)
+	For i = 0 To cursors.RowCount - 1
+		cursors.Position = i
+		strs = cursors.GetInt(cloumns(0))&"   "&cursors.GetString(cloumns(1))
+		ltvCapture.AddSingleLine2(strs,strs)
+	Next
+End Sub
+
+'发送指令
+Sub send_Cmd(cmd As String)
+	Dim byteArray(0) As Byte
+	Dim aStr As ByteConverter
+	'Dim cmd_type As String
+	
+	If cmd.Length < 22 Then
+		Return
+	End If
+	'发送指令给下位机
+	byteArray = aStr.HexToBytes(cmd)
+	aSync.Write(byteArray)
+	
+	'cmd_type = cmd.SubString2(2,8)
+	'ToastMessageShow(cmd_type,True)
+End Sub
+
+'解析下位机的数据
+Sub recevie_Cmd(cmd_Recevie As String)
+	Select cmd_Recevie.SubString2(10,16)
+		'握手返回
+		Case "03434f"
+			serial_Return_Data = 1
+		'托盘响应
+		Case "030102"
+			serial_Return_Data = 2
+		'电源和LED开关控制
+		Case "030201","030202","030203","030204","030205"
+			serial_Return_Data = 3
+		'恒温温度控制
+		Case "030301"
+			'恒温模块开启
+			If cmd_Recevie.SubString2(18,20) == "00" Then
+				serial_Return_Data = 4
+			End If
+			'恒温模块关闭
+			serial_Return_Data = 5
+		'恒温模块设置
+		Case "030302"
+			serial_Return_Data = 6
+		'恒温温度上报
+		Case "040302"
+			serial_Return_Data = 7	
+		'载玻片温度上报
+		Case "040303"
+			serial_Return_Data = 8
+		'适配器上报
+		Case "040401"
+			serial_Return_Data = 9
+		'电池上报
+		Case "040402"
+			serial_Return_Data = 10
+		'关机指令响应
+		Case "030502"
+			serial_Return_Data = 11
+		'关机指令上报
+		Case "040501"
+			serial_Return_Data = 12	
+		'错误指令不做处理
+		Case Else
+			serial_Return_Data = 13
+	End Select
+End Sub
+
+'数据操作(接收下位机传输的数据)
+Sub Astreams_NewData(Buffer() As Byte)
+	Dim cmd_Recevie As String
+	Dim conv As ByteConverter
+	
+	'AA5508001001434f4e544d
+	cmd_Recevie = conv.HexFromBytes(Buffer).ToLowerCase()
+	
+	'ToastMessageShow(cmd_Recevie,True)
+	
+	If cmd_Recevie.Length() < 22 Then
+		Return
+	End If
+	recevie_Cmd(cmd_Recevie)
+	
+	If serial_Return_Data <> 0 Then
+		excu_Cmd_Data
+	End If
+	'ToastMessageShow("通信成功",True)
+	
+	'ToastMessageShow("Success...",True)
+End Sub
+
+'数据错误
+Sub Astreams_Error()
+	ToastMessageShow(LastException.Message,True)
+End Sub
+
+'根据返回指令类型,判断执行什么动作
+Sub excu_Cmd_Data 
+	
+	serial_Return_Data = 0
+End Sub
