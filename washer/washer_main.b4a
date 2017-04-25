@@ -51,8 +51,6 @@ Sub Process_Globals
 	
 	'定时器
 	Dim taskTime As Timer
-	'轮询查询微信支付是否成功
-	Dim taskTime2 As Timer
 End Sub
 
 Sub Globals
@@ -151,12 +149,15 @@ Sub Globals
 	Dim order_desc As String = ""
 	
 	'载入图片
-	'0为载入公司logo
-'	'1为载入阿里二维码图片
-	Dim qrCodeShow As Int = 0
+'	'1为阿里二维码图片生成成功
+	Dim qrCodeShow_ali As Int = -1
+	'1为微信二维码图片生成成功
+	Dim qrCodeShow_weixin As Int = -1
 	
-	'判断是否支付成功
-	Dim pay_Flag As Int = -1
+	'判断是否ali支付成功
+	Dim pay_Flag_ali As Int = -1
+	'判断是否微信支付成功
+	Dim pay_Flag_weixin As Int = -1
 	
 	'头部导航栏标题
 	Dim tht_index_lbl_map As Map
@@ -201,7 +202,7 @@ Sub Globals
 	Dim usbSerial As SerialPort
 	
 	'串口参数
-	Dim SERIAL_PORT As String = ""
+	Dim SERIAL_PORT As String = "/dev/ttyAMA2"
 	Dim SERIAL_RATE As String = "9600"
 	Dim SERIAL_NUM As Int = 2
 	
@@ -252,7 +253,6 @@ Sub Activity_Create(FirstTime As Boolean)
 	
 	
 	taskTime.Initialize("taskTime",10)
-	taskTime2.Initialize("taskTime2",10)
 	
 	
 	lbl_index_tht.Text = tht_index_lbl_map.Get("page1")
@@ -271,6 +271,8 @@ Sub Activity_Create(FirstTime As Boolean)
 		ToastMessageShow(LastException.Message,True)
 	End Try
 	aSync.Initialize(usbSerial.InputStream,usbSerial.OutputStream,"Astreams")
+	
+	send_Cmd("ddddddddddddddddddddd")
 End Sub
 
 Sub Activity_Resume
@@ -323,6 +325,7 @@ Sub btn_personalized_Click
 	taskTime.Enabled = False
 	'返回值 1  二维码生成成功
 	load_photo_flag = alipay.QRCODE.returnSucOrFail("hggghttffght",alipay.PHOTO_PATH,alipay.MACHINE_QR_CODE_INFI,alipay.QRCODE_WIDTH_HEIGHT)
+	
 	taskTime.Enabled = True
 	tht_index.CurrentTab = 3
 End Sub
@@ -733,7 +736,7 @@ Sub btn_pay_cancel_Click
 End Sub
 Sub btn_pay_back_Click
 	tht_index.CurrentTab = current_tab
-	'processInit
+	qr_show_flag = -1
 End Sub
 Sub wv_pay_Ser_PageFinished (Url As String)
 	Dim jsStatement As String
@@ -756,32 +759,26 @@ Sub serverHTML(html As String)
 End Sub
 
 Sub weiXinHtml(html As String)
-	'提取微信二维码
-	'生成微信二维码图片
-	'ToastMessageShow(html,True)
-	qrCodeShow = weixinpay.qrCodeFromHtml(html)
-	
-End Sub
-
-Sub processHTML(html As String)
 	Dim parms_map As Map
 	Dim sb_url As StringBuilder
 	
 	sb_url.Initialize()
 	parms_map.Initialize()
 	
+	'提取微信二维码
+	'生成微信二维码图片
+	'ToastMessageShow(html,True)
 	If pay_load_url_flag == 0 Then
-		'取得二维码信息
-		qrCodeShow = alipay.getQrCodeFromHtml(html)
+		qrCodeShow_weixin = weixinpay.qrCodeFromHtml(html)
 		'取得支付成功信息
-		pay_Flag = alipay.getSuccessFromHtml(html)
-	
+		pay_Flag_weixin = alipay.getSuccessFromHtml(html)
+		
 		'支付成功，提取相关订单数据
-		If pay_Flag <> -1 Then
-			ToastMessageShow(html,True)
+		If pay_Flag_weixin <> -1 Then
+			'ToastMessageShow(html,True)
 			'浏览器自动转换'&'为'&amp;'
 			html = html.Replace("&amp;","&")
-			ToastMessageShow(html,True)
+			'ToastMessageShow(html,True)
 			parms_map = myutils.getOrderData(html)
 			pay_load_url_flag = 1
 			If parms_map <> Null And parms_map.Size > 0 Then
@@ -802,7 +799,55 @@ Sub processHTML(html As String)
 			Else
 				sb_url.Append("http://www.k91d.com/service/index.php?head=0527&type=ter&data=-1:-1:-1:-1:-1:-1:-1:-1")
 			End If
-			'ToastMessageShow(sb_url,True)
+			
+			wviewEx.addJavascriptInterface(wv_pay_Ser,"B4A")
+			wv_pay_Ser.LoadUrl(sb_url.ToString())
+			
+		End If
+	End If
+	
+End Sub
+
+Sub processHTML(html As String)
+	Dim parms_map As Map
+	Dim sb_url As StringBuilder
+	
+	sb_url.Initialize()
+	parms_map.Initialize()
+	
+	If pay_load_url_flag == 0 Then
+		'取得二维码信息
+		qrCodeShow_ali = alipay.getQrCodeFromHtml(html)
+		'取得支付成功信息
+		pay_Flag_ali = alipay.getSuccessFromHtml(html)
+	
+		'支付成功，提取相关订单数据
+		If pay_Flag_ali <> -1 Then
+			'ToastMessageShow(html,True)
+			'浏览器自动转换'&'为'&amp;'
+			html = html.Replace("&amp;","&")
+			'ToastMessageShow(html,True)
+			parms_map = myutils.getOrderData(html)
+			pay_load_url_flag = 1
+			If parms_map <> Null And parms_map.Size > 0 Then
+				sb_url.Append("http://www.k91d.com/service/index.php?head=0527&type=ter&data=")
+				sb_url.Append(parms_map.Get("out_trade_no")).Append(":")
+				sb_url.Append(parms_map.Get("body")).Append(":")
+				'订单类型???????
+				sb_url.Append("1").Append(":")
+				'订单状态  -1没有  1开始  2进行  3完成
+				sb_url.Append("1").Append(":")
+				'支付宝用户  buyer_email  buyer_id
+				sb_url.Append(parms_map.Get("buyer_email")).Append(":")
+				'用户类型 1 平台用户  2支付宝  3微信
+				sb_url.Append("2").Append(":")
+				'机器码：机器唯一标识
+				sb_url.Append("00000000001").Append(":")
+				sb_url.Append(parms_map.Get("total_fee"))
+			Else
+				sb_url.Append("http://www.k91d.com/service/index.php?head=0527&type=ter&data=-1:-1:-1:-1:-1:-1:-1:-1")
+			End If
+			
 			wviewEx.addJavascriptInterface(wv_pay_Ser,"B4A")
 			wv_pay_Ser.LoadUrl(sb_url.ToString())
 		End If
@@ -811,31 +856,40 @@ End Sub
 
 '定时器任务
 Sub taskTime_Tick
-	If qrCodeShow == 0 Then
-		igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.ALI_LOGO_NAME)
-		'ToastMessageShow("1",True)
-	End If
-	If qrCodeShow == 1 Then
-		If qr_show_flag == 0 Then
-			igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.QR_CODE_LOGO)
-		Else If qr_show_flag == 1 Then
-			igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,weixinpay.QR_NAME_WEIXIN)
-			'ToastMessageShow("微信",True)
-		Else If qr_show_flag == 2 Then
-			'igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.QR_CODE_LOGO)	
-			ToastMessageShow("公司",True)
-		End If
-		'igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.QR_CODE_LOGO)
-		'ToastMessageShow("2",True)
-		'taskTime.Enabled = False
-	End If
-	If pay_Flag <> -1 Then
+	If pay_Flag_ali <> -1 Then
 		If current_tab_count > 0 Then
 			tht_index.CurrentTab = current_tab_count - 1
 		End If
 		processInit
 		taskTime.Enabled = False
 		'ToastMessageShow("3",True)
+	End If
+	
+	If pay_Flag_weixin <> -1 Then
+		If current_tab_count > 0 Then
+			tht_index.CurrentTab = current_tab_count - 1
+		End If
+		processInit
+		taskTime.Enabled = False
+	End If
+
+	If qrCodeShow_ali <> 1 And qrCodeShow_weixin <> 1 Then
+		igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.ALI_LOGO_NAME)
+	Else
+		If qr_show_flag == 0 Then
+			If qrCodeShow_ali == 1 Then
+				igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,alipay.QR_CODE_LOGO)
+			End If
+		else If qr_show_flag == 1 Then
+			If qrCodeShow_weixin == 1 And pay_Flag_weixin == -1 Then
+				
+				igv_pay.Bitmap = LoadBitmap(alipay.PHOTO_PATH,weixinpay.WEIXIN_LOGO_QRCODE_NAME)
+			End If
+		else If qr_show_flag == 2 Then
+			
+			ToastMessageShow("公司",True)
+		End If
+		qr_show_flag = -1
 	End If
 	
 	If load_photo_flag == 1 Then
@@ -846,27 +900,19 @@ Sub taskTime_Tick
 	End If
 End Sub
 
-Sub taskTime2_Tick
-	If pay_Flag <> -1 Then
-		If current_tab_count > 0 Then
-			tht_index.CurrentTab = current_tab_count - 1
-		End If
-		processInit
-		taskTime.Enabled = False
-		'ToastMessageShow("3",True)
-	End If
-End Sub
-
 '所有的全局变量初始化
 Sub processInit
 	current_tab = 0
 	order_price = 0
 	order_desc = ""
-	qrCodeShow = 0
-	pay_Flag = -1
+	qrCodeShow_ali = -1
+	qrCodeShow_weixin = -1
+	pay_Flag_ali = -1
+	pay_Flag_weixin = -1
 	temporary_price = 0
 	pay_load_url_flag = -1
 	load_photo_flag = -1
+	qr_show_flag = -1
 End Sub
 
 ''''''''''''''''###############'''''''''''''''''''''
@@ -914,6 +960,7 @@ End Sub
 
 '解析下位机的数据
 Sub recevie_Cmd(cmd_Recevie As String)
+	ToastMessageShow(cmd_Recevie,True)
 	Select cmd_Recevie.SubString2(10,16)
 		'握手返回
 		Case "03434f"
@@ -991,4 +1038,5 @@ End Sub
 Sub excu_Cmd_Data 
 	'执行具体的操作
 	'serial_Return_Data = 0
+	
 End Sub
